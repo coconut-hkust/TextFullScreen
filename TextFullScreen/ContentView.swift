@@ -72,7 +72,12 @@ struct ContentView: View {
                         .ignoresSafeArea() // Run edge to edge: under the iPhone's notch and home indicator, and behind the keyboard
                     } else {
                         // Text fills the entire available space, measured by the glyphs themselves
-                        FillingTextView(text: text, font: settings.font, weight: settings.weight)
+                        FillingTextView(
+                            text: text,
+                            font: settings.font,
+                            weight: settings.weight,
+                            fill: CGFloat(settings.fillPercent) / 100
+                        )
                             .frame(width: geometry.size.width, height: geometry.size.height)
                             .contentShape(Rectangle())
                             .onTapGesture(perform: toggleInputPanel)

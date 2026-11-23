@@ -14,6 +14,8 @@ struct DisplaySettings: nonisolated DynamicProperty {
     /// Off: the text shrinks until all of it fits on screen (the original behavior).
     /// On: the text keeps a large size and moves across the screen.
     @AppStorage("scrollEnabled") var scrollEnabled = false
+    /// While scrolling is off: how much of the screen the text may fill at most, in percent.
+    @AppStorage("fillPercent") var fillPercent = 90
     @AppStorage("scrollMotion") var motion: ScrollMotion = .pan
     @AppStorage("panDirection") var panDirection: PanDirection = .rightToLeft
     @AppStorage("riseDirection") var riseDirection: RiseDirection = .bottomToTop
@@ -22,6 +24,7 @@ struct DisplaySettings: nonisolated DynamicProperty {
     /// Fraction of the largest text size that fits on screen while scrolling; 1 is the largest.
     @AppStorage("scrollTextSize") var scrollTextSize = 1.0
 
+    static let fillPercentRange = 80...100
     static let scrollSpeedRange = 0.25...4.0
     static let scrollTextSizeRange = 0.2...1.0
 

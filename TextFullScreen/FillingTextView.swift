@@ -12,15 +12,18 @@ struct FillingTextView: View {
     let text: String
     let font: TextFont
     let weight: TextWeight
+    /// The share of the screen's width and height the text may fill at most; 1 is all of it.
+    var fill: CGFloat = 1
     var color: Color = .black
 
     @Environment(\.fontResolutionContext) private var fontContext
 
     var body: some View {
         Canvas { context, size in
+            let fill = min(max(fill, 0.1), 1)
             guard let layout = FittedLayout(
                 text: text,
-                in: size,
+                in: CGSize(width: size.width * fill, height: size.height * fill),
                 makeFont: { font.font(size: $0, weight: weight).resolve(in: fontContext).ctFont }
             ) else { return }
             context.withCGContext { cg in

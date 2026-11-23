@@ -27,12 +27,35 @@ struct SettingsView: View {
 
             Section {
                 Toggle("Scroll text off screen", isOn: settings.$scrollEnabled)
+
+                if !settings.scrollEnabled {
+                    titled("Maximum size") {
+                        HStack(spacing: 12) {
+                            Slider(value: fillPercentForSlider, in: Double(DisplaySettings.fillPercentRange.lowerBound)...Double(DisplaySettings.fillPercentRange.upperBound), step: 1) {
+                                Text("Maximum size")
+                            }
+
+                            HStack(spacing: 2) {
+                                TextField("Percent", value: fillPercentClamped, format: .number)
+                                    .labelsHidden()
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 44)
+                                    .textFieldStyle(.roundedBorder)
+                                    #if !os(macOS)
+                                    .keyboardType(.numberPad)
+                                    #endif
+                                Text("%")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
             } header: {
                 Text("Layout")
             } footer: {
                 Text(settings.scrollEnabled
                      ? "Text stays large and moves across the screen."
-                     : "Text shrinks until all of it fits on the screen.")
+                     : "Text shrinks until all of it fits on the screen. Maximum size is how much of the screen's width and height it may fill.")
             }
 
             if settings.scrollEnabled {
@@ -113,6 +136,21 @@ struct SettingsView: View {
             slider()
         }
         #endif
+    }
+
+    private var fillPercentForSlider: Binding<Double> {
+        Binding(
+            get: { Double(settings.fillPercent) },
+            set: { settings.fillPercent = Int($0.rounded()) }
+        )
+    }
+
+    /// The typed percentage, kept within 80–100%.
+    private var fillPercentClamped: Binding<Int> {
+        Binding(
+            get: { settings.fillPercent },
+            set: { settings.fillPercent = min(max($0, DisplaySettings.fillPercentRange.lowerBound), DisplaySettings.fillPercentRange.upperBound) }
+        )
     }
 
     /// The speed slider moves on a doubling scale, so the middle of the track is normal speed,

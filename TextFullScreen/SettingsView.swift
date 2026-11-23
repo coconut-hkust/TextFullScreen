@@ -33,6 +33,14 @@ struct SettingsView: View {
                     }
                 }
 
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Saved Colors")
+                    SavedColorsView()
+                    Text("Click + to save the current color. To remove one, right-click it, or drag it away from its spot and let go. These are the same colors as in the color pad.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 Text("The quick brown fox")
                     .font(settings.font.font(size: 34, weight: settings.weight))
                     .foregroundStyle(settings.color.color)

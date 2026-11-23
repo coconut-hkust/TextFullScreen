@@ -66,7 +66,7 @@ struct ContentView: View {
                             sizeScale: settings.scrollTextSize
                         )
                         .id(settings.scrollDirection) // Start again from the edge when the direction changes
-                        .foregroundColor(.black)
+                        .foregroundColor(settings.color.color)
                         .contentShape(Rectangle())
                         .onTapGesture(perform: toggleInputPanel)
                         .ignoresSafeArea() // Run edge to edge: under the iPhone's notch and home indicator, and behind the keyboard
@@ -76,7 +76,8 @@ struct ContentView: View {
                             text: text,
                             font: settings.font,
                             weight: settings.weight,
-                            fill: CGFloat(settings.fillPercent) / 100
+                            fill: CGFloat(settings.fillPercent) / 100,
+                            color: settings.color.color
                         )
                             .frame(width: geometry.size.width, height: geometry.size.height)
                             .contentShape(Rectangle())

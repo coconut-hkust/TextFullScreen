@@ -16,8 +16,11 @@ struct SettingsView: View {
                     }
                 }
 
+                ColorPicker("Color", selection: colorBinding, supportsOpacity: false)
+
                 Text("The quick brown fox")
                     .font(settings.font.font(size: 34, weight: settings.weight))
+                    .foregroundStyle(settings.color.color)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .frame(maxWidth: .infinity)
@@ -61,6 +64,8 @@ struct SettingsView: View {
             if settings.scrollEnabled {
                 scrollingSection
             }
+
+            savedSection
         }
         .formStyle(.grouped)
         #if os(macOS)
@@ -136,6 +141,57 @@ struct SettingsView: View {
             slider()
         }
         #endif
+    }
+
+    /// Three slots that each keep a copy of every setting above.
+    private var savedSection: some View {
+        Section {
+            ForEach(1...DisplaySettings.slotCount, id: \.self) { slot in
+                let saved = settings.saved(inSlot: slot)
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(saved.flatMap { TextColor(rawValue: $0.color) }?.color ?? .clear)
+                        .overlay(Circle().stroke(.secondary.opacity(0.4)))
+                        .frame(width: 14, height: 14)
+                        .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Slot \(slot)")
+                        Text(saved?.summary ?? "Empty")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Button("Load") { settings.load(fromSlot: slot) }
+                        .disabled(saved == nil)
+                    Button("Save") { settings.save(toSlot: slot) }
+                    Button(role: .destructive) {
+                        settings.clear(slot: slot)
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .disabled(saved == nil)
+                    .help("Clear slot \(slot)")
+                    .accessibilityLabel("Clear slot \(slot)")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        } header: {
+            Text("Saved Settings")
+        } footer: {
+            Text("Save keeps a copy of the current font, color, size and scrolling settings. Load brings them back.")
+        }
+    }
+
+    private var colorBinding: Binding<Color> {
+        Binding(
+            get: { settings.color.color },
+            set: { settings.color = TextColor($0) }
+        )
     }
 
     private var fillPercentForSlider: Binding<Double> {

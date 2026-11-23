@@ -21,6 +21,8 @@ struct TextFullScreenApp: App {
         Settings {
             SettingsView()
         }
+        .defaultSize(width: 460, height: 620)
+        .windowResizability(.contentSize) // Fixed width; height between the view's minimum and maximum
         #endif
     }
 }

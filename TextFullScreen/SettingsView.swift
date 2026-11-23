@@ -75,8 +75,9 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         #if os(macOS)
+        // A set height, with the settings scrolling inside it. The window can be dragged taller or shorter.
         .frame(width: 460)
-        .fixedSize(horizontal: false, vertical: true) // Window grows and shrinks with the scrolling section
+        .frame(minHeight: 360, idealHeight: 620, maxHeight: .infinity)
         #endif
     }
 

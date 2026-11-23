@@ -87,7 +87,7 @@ struct ContentView: View {
                 VStack {
                     Spacer() // Push to bottom
                     
-                    HStack(alignment: .bottom, spacing: 0) {
+                    HStack(alignment: .center, spacing: 0) {
                         // Input Area
                         ZStack(alignment: .topLeading) {
                             if text.isEmpty && !isFocused {
@@ -107,7 +107,8 @@ struct ContentView: View {
                                 .frame(height: inputFrameHeight)
                         }
                         .padding(15)
-                        
+                        .frame(maxWidth: .infinity, alignment: .leading) // Take the free width, keeping the buttons at the right edge
+
                         // Clear Button
                         if !text.isEmpty {
                             Button(action: {
@@ -118,8 +119,8 @@ struct ContentView: View {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.system(size: 20))
                                     .foregroundColor(.secondary)
-                                    .padding(15)
-                                    .padding(.bottom, 5)
+                                    .padding(.vertical, 15)
+                                    .padding(.trailing, 12)
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
@@ -130,7 +131,6 @@ struct ContentView: View {
                                 .font(.system(size: 20))
                                 .foregroundColor(.secondary)
                                 .padding([.vertical, .trailing], 15)
-                                .padding(.bottom, 5)
                         }
                         .buttonStyle(PlainButtonStyle())
                         .help("Settings")

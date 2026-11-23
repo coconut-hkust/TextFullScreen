@@ -52,6 +52,13 @@ struct DisplaySettings: nonisolated DynamicProperty {
     @AppStorage("scrollSpeed") var scrollSpeed = 1.0
     /// Fraction of the largest text size that fits on screen while scrolling; 1 is the largest.
     @AppStorage("scrollTextSize") var scrollTextSize = 1.0
+    /// Off: scrolling text uses the same Maximum size as fitted text. On: it has its own (`scrollTextSize`).
+    @AppStorage("separateScrollSize") var separateScrollSize = false
+
+    /// The size scrolling text is drawn at, as a fraction of the largest that fits.
+    var scrollSizeInUse: Double {
+        separateScrollSize ? scrollTextSize : Double(fillPercent) / 100
+    }
 
     static let fillPercentRange = 80...100
     static let scrollSpeedRange = 0.25...4.0
@@ -82,6 +89,7 @@ struct DisplaySettings: nonisolated DynamicProperty {
             fillPercent: fillPercent, scrollEnabled: scrollEnabled, motion: motion.rawValue,
             panDirection: panDirection.rawValue, riseDirection: riseDirection.rawValue,
             scrollSpeed: scrollSpeed, scrollTextSize: scrollTextSize,
+            separateScrollSize: separateScrollSize,
             colorSlots: Self.rawValue(of: colorSlots)
         )
         guard let data = try? JSONEncoder().encode(current) else { return }
@@ -101,6 +109,8 @@ struct DisplaySettings: nonisolated DynamicProperty {
         if let value = RiseDirection(rawValue: saved.riseDirection) { riseDirection = value }
         scrollSpeed = saved.scrollSpeed
         scrollTextSize = saved.scrollTextSize
+        // Slots saved before this choice existed kept the two sizes apart
+        separateScrollSize = saved.separateScrollSize ?? true
         // Slots saved before colors were included leave the saved colors as they are
         if let raw = saved.colorSlots { colorSlots = Self.colorSlots(from: raw) }
     }
@@ -119,6 +129,7 @@ struct DisplaySettings: nonisolated DynamicProperty {
         riseDirection = .bottomToTop
         scrollSpeed = 1
         scrollTextSize = 1
+        separateScrollSize = false
     }
 
     func clear(slot: Int) {
@@ -159,6 +170,8 @@ nonisolated struct SavedSettings: Codable, Sendable {
     var riseDirection: String
     var scrollSpeed: Double
     var scrollTextSize: Double
+    /// Nil in slots saved before this choice existed.
+    var separateScrollSize: Bool?
     /// The saved colors, in the same form as `DisplaySettings.colorSlots`. Nil in slots saved
     /// before colors were included.
     var colorSlots: String?

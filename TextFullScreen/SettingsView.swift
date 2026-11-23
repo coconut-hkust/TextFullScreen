@@ -53,17 +53,18 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle("Separate maximum size for scrolling", isOn: settings.$separateScrollSize)
+
                 Toggle("Scroll text off screen", isOn: settings.$scrollEnabled)
 
-                if !settings.scrollEnabled {
+                // Shared by both layouts unless scrolling has its own, shown in the Scrolling section
+                if !settings.scrollEnabled || !settings.separateScrollSize {
                     percentControl("Maximum size", value: settings.$fillPercent, in: DisplaySettings.fillPercentRange)
                 }
             } header: {
                 Text("Layout")
             } footer: {
-                Text(settings.scrollEnabled
-                     ? "Text stays large and moves across the screen."
-                     : "Text shrinks until all of it fits on the screen. Maximum size is how much of the screen's width and height it may fill.")
+                Text(layoutFooter)
             }
 
             if settings.scrollEnabled {
@@ -116,7 +117,9 @@ struct SettingsView: View {
                 }
             }
 
-            percentControl("Maximum size", value: scrollSizePercent, in: scrollSizePercentRange)
+            if settings.separateScrollSize {
+                percentControl("Maximum size", value: scrollSizePercent, in: scrollSizePercentRange)
+            }
         } header: {
             Text("Scrolling")
         } footer: {
@@ -157,6 +160,16 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private var layoutFooter: String {
+        let mode = settings.scrollEnabled
+            ? "Text stays large and moves across the screen."
+            : "Text shrinks until all of it fits on the screen. Maximum size is how much of the screen's width and height it may fill."
+        let sharing = settings.separateScrollSize
+            ? "Scrolling text has its own maximum size."
+            : "The same maximum size is used whether the text scrolls or not."
+        return mode + " " + sharing
     }
 
     /// The scrolling text size as a whole percentage (stored as a fraction of the largest size).

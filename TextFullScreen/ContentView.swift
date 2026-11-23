@@ -63,7 +63,7 @@ struct ContentView: View {
                             weight: settings.weight,
                             direction: settings.scrollDirection,
                             speed: settings.scrollSpeed,
-                            sizeScale: settings.scrollTextSize
+                            sizeScale: settings.scrollSizeInUse
                         )
                         .id(settings.scrollDirection) // Start again from the edge when the direction changes
                         .foregroundColor(settings.color.color)

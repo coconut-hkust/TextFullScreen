@@ -56,26 +56,7 @@ struct SettingsView: View {
                 Toggle("Scroll text off screen", isOn: settings.$scrollEnabled)
 
                 if !settings.scrollEnabled {
-                    titled("Maximum size") {
-                        HStack(spacing: 12) {
-                            Slider(value: fillPercentForSlider, in: Double(DisplaySettings.fillPercentRange.lowerBound)...Double(DisplaySettings.fillPercentRange.upperBound), step: 1) {
-                                Text("Maximum size")
-                            }
-
-                            HStack(spacing: 2) {
-                                TextField("Percent", value: fillPercentClamped, format: .number)
-                                    .labelsHidden()
-                                    .multilineTextAlignment(.trailing)
-                                    .frame(width: 44)
-                                    .textFieldStyle(.roundedBorder)
-                                    #if !os(macOS)
-                                    .keyboardType(.numberPad)
-                                    #endif
-                                Text("%")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
+                    percentControl("Maximum size", value: settings.$fillPercent, in: DisplaySettings.fillPercentRange)
                 }
             } header: {
                 Text("Layout")
@@ -135,22 +116,59 @@ struct SettingsView: View {
                 }
             }
 
-            titled("Size") {
-                Slider(value: settings.$scrollTextSize, in: DisplaySettings.scrollTextSizeRange) {
-                    Text("Size")
-                } minimumValueLabel: {
-                    Image(systemName: "textformat.size.smaller")
-                } maximumValueLabel: {
-                    Image(systemName: "textformat.size.larger")
-                }
-            }
+            percentControl("Maximum size", value: scrollSizePercent, in: scrollSizePercentRange)
         } header: {
             Text("Scrolling")
         } footer: {
             Text(settings.motion == .pan
-                 ? "Pan runs the text along one line. At full size it's as tall as the screen allows."
-                 : "Rise wraps the text to the screen width. At full size, the longest word just fits across the screen.")
+                 ? "Pan runs the text along one line. At 100% it's as tall as the screen allows."
+                 : "Rise wraps the text to the screen width. At 100%, the longest word just fits across the screen.")
         }
+    }
+
+    /// A percentage picked with a slider, or typed into the box on its right. Typed values are kept
+    /// within `range`.
+    private func percentControl(_ title: LocalizedStringKey, value: Binding<Int>, in range: ClosedRange<Int>) -> some View {
+        let clamped = Binding<Int>(
+            get: { value.wrappedValue },
+            set: { value.wrappedValue = min(max($0, range.lowerBound), range.upperBound) }
+        )
+        let sliderValue = Binding<Double>(
+            get: { Double(value.wrappedValue) },
+            set: { clamped.wrappedValue = Int($0.rounded()) }
+        )
+        return titled(title) {
+            HStack(spacing: 12) {
+                Slider(value: sliderValue, in: Double(range.lowerBound)...Double(range.upperBound), step: 1) {
+                    Text(title)
+                }
+
+                HStack(spacing: 2) {
+                    TextField("Percent", value: clamped, format: .number)
+                        .labelsHidden()
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 44)
+                        .textFieldStyle(.roundedBorder)
+                        #if !os(macOS)
+                        .keyboardType(.numberPad)
+                        #endif
+                    Text("%")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    /// The scrolling text size as a whole percentage (stored as a fraction of the largest size).
+    private var scrollSizePercent: Binding<Int> {
+        Binding(
+            get: { Int((settings.scrollTextSize * 100).rounded()) },
+            set: { settings.scrollTextSize = Double($0) / 100 }
+        )
+    }
+
+    private var scrollSizePercentRange: ClosedRange<Int> {
+        Int(DisplaySettings.scrollTextSizeRange.lowerBound * 100)...Int(DisplaySettings.scrollTextSizeRange.upperBound * 100)
     }
 
     /// A slider row with its name showing. The Mac shows a slider's own label beside it; iPhone
@@ -236,21 +254,6 @@ struct SettingsView: View {
         } footer: {
             Text("Save keeps a copy of the current font, color, saved colors, size and scrolling settings. Load brings them back.")
         }
-    }
-
-    private var fillPercentForSlider: Binding<Double> {
-        Binding(
-            get: { Double(settings.fillPercent) },
-            set: { settings.fillPercent = Int($0.rounded()) }
-        )
-    }
-
-    /// The typed percentage, kept within 80–100%.
-    private var fillPercentClamped: Binding<Int> {
-        Binding(
-            get: { settings.fillPercent },
-            set: { settings.fillPercent = min(max($0, DisplaySettings.fillPercentRange.lowerBound), DisplaySettings.fillPercentRange.upperBound) }
-        )
     }
 
     /// The speed slider moves on a doubling scale, so the middle of the track is normal speed,

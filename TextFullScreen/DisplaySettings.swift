@@ -15,7 +15,7 @@ struct DisplaySettings: nonisolated DynamicProperty {
     /// On: the text keeps a large size and moves across the screen.
     @AppStorage("scrollEnabled") var scrollEnabled = false
     /// While scrolling is off: how much of the screen the text may fill at most, in percent.
-    @AppStorage("fillPercent") var fillPercent = 90
+    @AppStorage("fillPercent") var fillPercent = 80
     @AppStorage("scrollMotion") var motion: ScrollMotion = .pan
     @AppStorage("panDirection") var panDirection: PanDirection = .rightToLeft
     @AppStorage("riseDirection") var riseDirection: RiseDirection = .bottomToTop

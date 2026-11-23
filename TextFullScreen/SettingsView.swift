@@ -5,6 +5,7 @@ import SwiftUI
 struct SettingsView: View {
     private var settings = DisplaySettings()
     @State private var isColorPadShown = false
+    @State private var isConfirmingDefaults = false
 
     var body: some View {
         Form {
@@ -166,9 +167,36 @@ struct SettingsView: View {
         #endif
     }
 
-    /// Three slots that each keep a copy of every setting above.
+    /// The app's defaults, then three slots that each keep a copy of every setting above.
     private var savedSection: some View {
         Section {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.counterclockwise.circle")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 14, height: 14)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Default Settings")
+                    Text("SF Pro · Black · 80% · no saved colors")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                Button("Load") { isConfirmingDefaults = true }
+                    .confirmationDialog("Load the default settings?", isPresented: $isConfirmingDefaults) {
+                        Button("Load Defaults", role: .destructive) { settings.loadDefaults() }
+                    } message: {
+                        Text("The font, color, size and scrolling settings go back to how the app first starts, and all saved colors are removed. Your saved slots are kept.")
+                    }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
             ForEach(1...DisplaySettings.slotCount, id: \.self) { slot in
                 let saved = settings.saved(inSlot: slot)
                 HStack(spacing: 10) {
@@ -206,7 +234,7 @@ struct SettingsView: View {
         } header: {
             Text("Saved Settings")
         } footer: {
-            Text("Save keeps a copy of the current font, color, size and scrolling settings. Load brings them back.")
+            Text("Save keeps a copy of the current font, color, saved colors, size and scrolling settings. Load brings them back.")
         }
     }
 

@@ -16,21 +16,28 @@ struct DisplaySettings: nonisolated DynamicProperty {
     /// Colors saved by an earlier version, which kept a plain list. Moved into the squares on first use.
     @AppStorage("savedColors") private var oldSavedColorsRaw = ""
 
-    static let colorSlotCount = 40
+    nonisolated static let colorSlotCount = 40
 
     var colorSlots: [TextColor?] {
         get {
-            let source = colorSlotsRaw.isEmpty ? oldSavedColorsRaw : colorSlotsRaw
-            var slots: [TextColor?] = source.isEmpty
-                ? []
-                : source.split(separator: ";", omittingEmptySubsequences: false).map { TextColor(rawValue: String($0)) }
-            slots += Array(repeating: nil, count: max(0, Self.colorSlotCount - slots.count))
-            return Array(slots.prefix(Self.colorSlotCount))
+            Self.colorSlots(from: colorSlotsRaw.isEmpty ? oldSavedColorsRaw : colorSlotsRaw)
         }
         nonmutating set {
-            colorSlotsRaw = newValue.prefix(Self.colorSlotCount).map { $0?.rawValue ?? "" }.joined(separator: ";")
+            colorSlotsRaw = Self.rawValue(of: newValue)
             oldSavedColorsRaw = ""
         }
+    }
+
+    nonisolated static func colorSlots(from raw: String) -> [TextColor?] {
+        var slots: [TextColor?] = raw.isEmpty
+            ? []
+            : raw.split(separator: ";", omittingEmptySubsequences: false).map { TextColor(rawValue: String($0)) }
+        slots += Array(repeating: nil, count: max(0, colorSlotCount - slots.count))
+        return Array(slots.prefix(colorSlotCount))
+    }
+
+    nonisolated static func rawValue(of slots: [TextColor?]) -> String {
+        slots.prefix(colorSlotCount).map { $0?.rawValue ?? "" }.joined(separator: ";")
     }
 
     /// Off: the text shrinks until all of it fits on screen (the original behavior).
@@ -74,7 +81,8 @@ struct DisplaySettings: nonisolated DynamicProperty {
             font: font.rawValue, weight: weight.rawValue, color: color.rawValue,
             fillPercent: fillPercent, scrollEnabled: scrollEnabled, motion: motion.rawValue,
             panDirection: panDirection.rawValue, riseDirection: riseDirection.rawValue,
-            scrollSpeed: scrollSpeed, scrollTextSize: scrollTextSize
+            scrollSpeed: scrollSpeed, scrollTextSize: scrollTextSize,
+            colorSlots: Self.rawValue(of: colorSlots)
         )
         guard let data = try? JSONEncoder().encode(current) else { return }
         setSlotJSON(String(decoding: data, as: UTF8.self), slot)
@@ -93,6 +101,24 @@ struct DisplaySettings: nonisolated DynamicProperty {
         if let value = RiseDirection(rawValue: saved.riseDirection) { riseDirection = value }
         scrollSpeed = saved.scrollSpeed
         scrollTextSize = saved.scrollTextSize
+        // Slots saved before colors were included leave the saved colors as they are
+        if let raw = saved.colorSlots { colorSlots = Self.colorSlots(from: raw) }
+    }
+
+    /// Puts every setting back to how the app first starts, and removes all saved colors.
+    /// The saved-settings slots themselves are kept. Values match the declarations above.
+    func loadDefaults() {
+        font = .standard
+        weight = .black
+        color = .black
+        colorSlots = Array(repeating: nil, count: Self.colorSlotCount)
+        scrollEnabled = false
+        fillPercent = 80
+        motion = .pan
+        panDirection = .rightToLeft
+        riseDirection = .bottomToTop
+        scrollSpeed = 1
+        scrollTextSize = 1
     }
 
     func clear(slot: Int) {
@@ -133,15 +159,24 @@ nonisolated struct SavedSettings: Codable, Sendable {
     var riseDirection: String
     var scrollSpeed: Double
     var scrollTextSize: Double
+    /// The saved colors, in the same form as `DisplaySettings.colorSlots`. Nil in slots saved
+    /// before colors were included.
+    var colorSlots: String?
 
-    /// A short description for the slot's row, e.g. "SF Pro · Black · 80%".
+    /// How many saved colors the slot holds, if it holds them.
+    var savedColorCount: Int? {
+        colorSlots.map { DisplaySettings.colorSlots(from: $0).compactMap { $0 }.count }
+    }
+
+    /// A short description for the slot's row, e.g. "SF Pro · Black · 80% · 3 colors".
     var summary: String {
         let fontName = TextFont(rawValue: font)?.displayName ?? "Font"
         let weightName = TextWeight(rawValue: weight)?.displayName ?? ""
         let layout = scrollEnabled
             ? (ScrollMotion(rawValue: motion)?.displayName ?? "Scroll")
             : "\(fillPercent)%"
-        return [fontName, weightName, layout].filter { !$0.isEmpty }.joined(separator: " · ")
+        let colors = savedColorCount.map { $0 == 1 ? "1 color" : "\($0) colors" } ?? ""
+        return [fontName, weightName, layout, colors].filter { !$0.isEmpty }.joined(separator: " · ")
     }
 }
 

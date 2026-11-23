@@ -4,6 +4,7 @@ import SwiftUI
 /// On macOS this fills the Settings window (⌘,). On iPhone and iPad, `SettingsButton` shows it in a sheet.
 struct SettingsView: View {
     private var settings = DisplaySettings()
+    @State private var isColorPadShown = false
 
     var body: some View {
         Form {
@@ -16,14 +17,20 @@ struct SettingsView: View {
                     }
                 }
 
-                ColorPicker("Color", selection: colorBinding, supportsOpacity: false)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Saved Colors")
-                    SavedColorsView()
-                    Text("Click + to save the current color. To remove one, right-click it, or drag it away from its spot and let go.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                LabeledContent("Color") {
+                    Button { isColorPadShown.toggle() } label: {
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(settings.color.color)
+                            .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(.secondary.opacity(0.5)))
+                            .frame(width: 44, height: 22)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Choose the text color")
+                    .accessibilityLabel("Text color, \(settings.color.hex)")
+                    .popover(isPresented: $isColorPadShown, arrowEdge: .trailing) {
+                        ColorPadView()
+                    }
                 }
 
                 Text("The quick brown fox")
@@ -193,13 +200,6 @@ struct SettingsView: View {
         } footer: {
             Text("Save keeps a copy of the current font, color, size and scrolling settings. Load brings them back.")
         }
-    }
-
-    private var colorBinding: Binding<Color> {
-        Binding(
-            get: { settings.color.color },
-            set: { settings.color = TextColor($0) }
-        )
     }
 
     private var fillPercentForSlider: Binding<Double> {

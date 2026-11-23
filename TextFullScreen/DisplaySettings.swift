@@ -11,14 +11,26 @@ struct DisplaySettings: nonisolated DynamicProperty {
     @AppStorage("textFont") var font: TextFont = .standard
     @AppStorage("textWeight") var weight: TextWeight = .black
     @AppStorage("textColor") var color: TextColor = .black
-    /// The user's own colors to pick from, oldest first, separated by ";".
-    @AppStorage("savedColors") private var savedColorsRaw = ""
+    /// The color pad's saved-color squares, in order; nil is an empty square. Stored separated by ";".
+    @AppStorage("colorSlots") private var colorSlotsRaw = ""
+    /// Colors saved by an earlier version, which kept a plain list. Moved into the squares on first use.
+    @AppStorage("savedColors") private var oldSavedColorsRaw = ""
 
-    static let maxSavedColors = 16
+    static let colorSlotCount = 40
 
-    var savedColors: [TextColor] {
-        get { savedColorsRaw.split(separator: ";").compactMap { TextColor(rawValue: String($0)) } }
-        nonmutating set { savedColorsRaw = newValue.prefix(Self.maxSavedColors).map(\.rawValue).joined(separator: ";") }
+    var colorSlots: [TextColor?] {
+        get {
+            let source = colorSlotsRaw.isEmpty ? oldSavedColorsRaw : colorSlotsRaw
+            var slots: [TextColor?] = source.isEmpty
+                ? []
+                : source.split(separator: ";", omittingEmptySubsequences: false).map { TextColor(rawValue: String($0)) }
+            slots += Array(repeating: nil, count: max(0, Self.colorSlotCount - slots.count))
+            return Array(slots.prefix(Self.colorSlotCount))
+        }
+        nonmutating set {
+            colorSlotsRaw = newValue.prefix(Self.colorSlotCount).map { $0?.rawValue ?? "" }.joined(separator: ";")
+            oldSavedColorsRaw = ""
+        }
     }
 
     /// Off: the text shrinks until all of it fits on screen (the original behavior).
@@ -156,6 +168,57 @@ nonisolated struct TextColor: Hashable, Sendable, RawRepresentable {
     init(_ color: Color) {
         let resolved = color.resolve(in: EnvironmentValues())
         self.init(red: Double(resolved.red), green: Double(resolved.green), blue: Double(resolved.blue), opacity: Double(resolved.opacity))
+    }
+
+    // MARK: Hue, saturation and brightness (all 0...1)
+
+    init(hue: Double, saturation: Double, brightness: Double) {
+        let h = (hue.truncatingRemainder(dividingBy: 1) + 1).truncatingRemainder(dividingBy: 1) * 6
+        let s = min(max(saturation, 0), 1), v = min(max(brightness, 0), 1)
+        let i = Int(h.rounded(.down)) % 6
+        let f = h - h.rounded(.down)
+        let p = v * (1 - s), q = v * (1 - s * f), t = v * (1 - s * (1 - f))
+        switch i {
+        case 0: self.init(red: v, green: t, blue: p)
+        case 1: self.init(red: q, green: v, blue: p)
+        case 2: self.init(red: p, green: v, blue: t)
+        case 3: self.init(red: p, green: q, blue: v)
+        case 4: self.init(red: t, green: p, blue: v)
+        default: self.init(red: v, green: p, blue: q)
+        }
+    }
+
+    var hsb: (hue: Double, saturation: Double, brightness: Double) {
+        let maxC = max(red, green, blue), minC = min(red, green, blue), delta = maxC - minC
+        var hue = 0.0
+        if delta > 0 {
+            if maxC == red { hue = ((green - blue) / delta).truncatingRemainder(dividingBy: 6) }
+            else if maxC == green { hue = (blue - red) / delta + 2 }
+            else { hue = (red - green) / delta + 4 }
+            hue /= 6
+            if hue < 0 { hue += 1 }
+        }
+        return (hue, maxC == 0 ? 0 : delta / maxC, maxC)
+    }
+
+    // MARK: Hex
+
+    /// Reads "#RRGGBB" or "RRGGBB".
+    init?(hex: String) {
+        var digits = hex.trimmingCharacters(in: .whitespaces)
+        if digits.hasPrefix("#") { digits.removeFirst() }
+        guard digits.count == 6, let value = UInt32(digits, radix: 16) else { return nil }
+        self.init(
+            red: Double((value >> 16) & 0xFF) / 255,
+            green: Double((value >> 8) & 0xFF) / 255,
+            blue: Double(value & 0xFF) / 255
+        )
+    }
+
+    /// e.g. "#FF8000"
+    var hex: String {
+        let byte = { (v: Double) in Int((min(max(v, 0), 1) * 255).rounded()) }
+        return String(format: "#%02X%02X%02X", byte(red), byte(green), byte(blue))
     }
 
     /// e.g. "0.000,0.478,1.000,1.000"

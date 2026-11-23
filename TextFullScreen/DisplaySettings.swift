@@ -11,6 +11,15 @@ struct DisplaySettings: nonisolated DynamicProperty {
     @AppStorage("textFont") var font: TextFont = .standard
     @AppStorage("textWeight") var weight: TextWeight = .black
     @AppStorage("textColor") var color: TextColor = .black
+    /// The user's own colors to pick from, oldest first, separated by ";".
+    @AppStorage("savedColors") private var savedColorsRaw = ""
+
+    static let maxSavedColors = 16
+
+    var savedColors: [TextColor] {
+        get { savedColorsRaw.split(separator: ";").compactMap { TextColor(rawValue: String($0)) } }
+        nonmutating set { savedColorsRaw = newValue.prefix(Self.maxSavedColors).map(\.rawValue).joined(separator: ";") }
+    }
 
     /// Off: the text shrinks until all of it fits on screen (the original behavior).
     /// On: the text keeps a large size and moves across the screen.

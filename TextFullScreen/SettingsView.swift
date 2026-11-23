@@ -18,6 +18,14 @@ struct SettingsView: View {
 
                 ColorPicker("Color", selection: colorBinding, supportsOpacity: false)
 
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Saved Colors")
+                    SavedColorsView()
+                    Text("Click + to save the current color. To remove one, right-click it, or drag it away from its spot and let go.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 Text("The quick brown fox")
                     .font(settings.font.font(size: 34, weight: settings.weight))
                     .foregroundStyle(settings.color.color)

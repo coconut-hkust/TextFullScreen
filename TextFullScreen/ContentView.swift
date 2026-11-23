@@ -71,15 +71,9 @@ struct ContentView: View {
                         .onTapGesture(perform: toggleInputPanel)
                         .ignoresSafeArea() // Run edge to edge: under the iPhone's notch and home indicator, and behind the keyboard
                     } else {
-                        // Text fills the entire available space
-                        Text(text)
-                            .font(settings.font.font(size: 2000, weight: settings.weight)) // Massive size
-                            .minimumScaleFactor(0.01) // Allow shrinking to fit
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.black)
-                            .lineLimit(nil)
-                            .padding(0) // No padding to maximize size
-                            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .center) // Center alignment
+                        // Text fills the entire available space, measured by the glyphs themselves
+                        FillingTextView(text: text, font: settings.font, weight: settings.weight)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
                             .contentShape(Rectangle())
                             .onTapGesture(perform: toggleInputPanel)
                     }

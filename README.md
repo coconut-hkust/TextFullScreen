@@ -13,7 +13,20 @@ Runs on **iPhone, iPad and Mac** from one SwiftUI project.
 - **Saved settings.** Three slots store a full look (font, colours, sizes), plus a Default Settings row.
 - **Liquid Glass app icon.**
 
-## Requirements
+## Download for Mac
+
+Needs macOS 26.1 or later. Runs on Apple silicon and Intel Macs.
+
+1. Download **TextFullScreen.zip** from the [latest release](https://github.com/coconut-hkust/TextFullScreen/releases/latest) and double-click it to unzip.
+2. Drag **TextFullScreen** into your **Applications** folder.
+3. Open it. macOS says it can't verify the developer, because the app isn't notarized by Apple. Click **Done**.
+4. Go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to TextFullScreen. Enter your Mac password if asked.
+
+You only need to do this once. After that the app opens normally.
+
+On iPhone and iPad, the app isn't on the App Store yet. For now you can build it yourself (see below).
+
+## Requirements for building
 
 - Xcode 26 or later
 - iOS / iPadOS 26.1 or later, or macOS 26.1 or later

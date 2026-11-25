@@ -1,4 +1,4 @@
-Required Notice: Copyright 2026 Fatpiggy121 (https://github.com/Fatpiggy121)
+Required Notice: Copyright 2026 coconut-hkust (https://github.com/coconut-hkust)
 
 # PolyForm Noncommercial License 1.0.0
 

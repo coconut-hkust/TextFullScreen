@@ -59,6 +59,11 @@ struct ContentView: View {
                             Spacer()
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        #if !os(macOS)
+                        // With nothing typed yet, a tap only puts the keyboard away
+                        .contentShape(Rectangle())
+                        .onTapGesture { isFocused = false }
+                        #endif
                     } else if settings.scrollEnabled {
                         // Text keeps a large size and scrolls across (and off) the screen
                         ScrollingTextView(
@@ -265,8 +270,16 @@ struct ContentView: View {
         #endif
     }
 
-    // Tapping the big text shows or hides the input panel
+    // Tapping the big text shows or hides the input panel. On iPhone and iPad, while the keyboard
+    // is up, the first tap only puts the keyboard away (an iPhone keyboard has no key for it), and
+    // the next tap hides the panel.
     private func toggleInputPanel() {
+        #if !os(macOS)
+        if isFocused {
+            isFocused = false
+            return
+        }
+        #endif
         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
             isInputVisible.toggle()
         }

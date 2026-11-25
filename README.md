@@ -17,7 +17,7 @@ Runs on **iPhone, iPad and Mac** from one SwiftUI project.
 
 Needs macOS 26.1 or later. Runs on Apple silicon and Intel Macs.
 
-1. Download **TextFullScreen.zip** from the [latest release](https://github.com/coconut-hkust/TextFullScreen/releases/latest) and double-click it to unzip.
+1. Download the **TextFullScreen-v.1.xxx.zip** file (for example `TextFullScreen-v.1.000.zip`) from the [latest release](https://github.com/coconut-hkust/TextFullScreen/releases/latest) and double-click it to unzip.
 2. Drag **TextFullScreen** into your **Applications** folder.
 3. Open it. macOS says it can't verify the developer, because the app isn't notarized by Apple. Click **Done**.
 4. Go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to TextFullScreen. Enter your Mac password if asked.

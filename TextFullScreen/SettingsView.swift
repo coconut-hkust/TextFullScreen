@@ -58,7 +58,7 @@ struct SettingsView: View {
             Section {
                 Toggle("Separate maximum size for scrolling", isOn: settings.$separateScrollSize)
 
-                Toggle("Scroll text off screen", isOn: settings.$scrollEnabled)
+                Toggle("Scrolling", isOn: settings.$scrollEnabled)
 
                 // Shared by both layouts unless scrolling has its own, shown in the Scrolling section
                 if !settings.scrollEnabled || !settings.separateScrollSize {

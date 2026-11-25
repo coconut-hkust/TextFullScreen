@@ -5,6 +5,7 @@ import SwiftUI
 struct SettingsView: View {
     private var settings = DisplaySettings()
     @State private var isColorPadShown = false
+    @State private var isGradientPadShown = false
     @State private var isConfirmingDefaults = false
 
     var body: some View {
@@ -42,15 +43,17 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Text("The quick brown fox")
+                previewText("The quick brown fox")
                     .font(settings.font.font(size: 34, weight: settings.weight))
-                    .foregroundStyle(settings.color.color)
+                    .textFill(settings.gradient, plain: settings.color.color)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 4)
                     .accessibilityLabel("Font preview")
             }
+
+            gradientSection
 
             Section {
                 Toggle("Separate maximum size for scrolling", isOn: settings.$separateScrollSize)
@@ -74,11 +77,122 @@ struct SettingsView: View {
             savedSection
         }
         .formStyle(.grouped)
+        .preferredColorScheme(settings.appScheme.colorScheme)
         #if os(macOS)
         // A set height, with the settings scrolling inside it. The window can be dragged taller or shorter.
         .frame(width: 460)
         .frame(minHeight: 360, idealHeight: 620, maxHeight: .infinity)
         #endif
+    }
+
+    /// The preview line, colored per character or word when the gradient does that.
+    private func previewText(_ string: String) -> Text {
+        if let gradient = settings.gradient, gradient.style != .whole {
+            Text(gradient.attributedString(string))
+        } else {
+            Text(verbatim: string)
+        }
+    }
+
+    /// A switch for painting the text with a gradient, and how the gradient is laid over it.
+    private var gradientSection: some View {
+        Section {
+            Toggle("Gradient", isOn: settings.$gradientEnabled)
+
+            if settings.gradientEnabled {
+                LabeledContent("Colors") {
+                    Button { isGradientPadShown.toggle() } label: {
+                        Capsule()
+                            .fill(settings.gradientColors.isEmpty
+                                  ? AnyShapeStyle(.quaternary)
+                                  : AnyShapeStyle(LinearGradient(colors: settings.gradientColors.map(\.color), startPoint: .leading, endPoint: .trailing)))
+                            .overlay(Capsule().strokeBorder(.secondary.opacity(0.5)))
+                            .frame(width: 96, height: 22)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Choose the gradient colors")
+                    .accessibilityLabel("Gradient colors, \(settings.gradientColors.map(\.hex).joined(separator: ", "))")
+                    .popover(isPresented: $isGradientPadShown, arrowEdge: .trailing) {
+                        GradientPadView()
+                    }
+                }
+
+                Picker("Style", selection: settings.$gradientStyle) {
+                    ForEach(GradientStyle.allCases) { style in
+                        Text(style.displayName).tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if settings.gradientStyle == .whole {
+                    Picker("Background", selection: settings.$gradientAnchor) {
+                        ForEach(GradientAnchor.allCases) { anchor in
+                            Text(anchor.displayName).tag(anchor)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Picker("Direction", selection: settings.$gradientDirection) {
+                        ForEach(GradientDirection.allCases) { direction in
+                            Text(direction.displayName)
+                                .accessibilityLabel(direction.accessibilityName)
+                                .tag(direction)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                } else {
+                    Toggle("Repeat the gradient", isOn: settings.$gradientRepeats)
+
+                    if settings.gradientRepeats {
+                        shadesBetweenControl
+                    }
+                }
+            }
+        } header: {
+            Text("Gradient")
+        } footer: {
+            Text(gradientFooter)
+        }
+    }
+
+    /// The number of in-between shades: typed into the box, or nudged with the arrows.
+    private var shadesBetweenControl: some View {
+        let range = TextGradient.shadesBetweenRange
+        let clamped = Binding<Int>(
+            get: { settings.gradientShadesBetween },
+            set: { settings.gradientShadesBetween = min(max($0, range.lowerBound), range.upperBound) }
+        )
+        return LabeledContent("Shades between colors") {
+            HStack(spacing: 6) {
+                TextField("Shades", value: clamped, format: .number)
+                    .labelsHidden()
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 44)
+                    .textFieldStyle(.roundedBorder)
+                    #if !os(macOS)
+                    .keyboardType(.numberPad)
+                    #endif
+                Stepper("Shades between colors", value: clamped, in: range)
+                    .labelsHidden()
+            }
+        }
+    }
+
+    private var gradientFooter: String {
+        guard settings.gradientEnabled else { return "Paints the text with several colors instead of one." }
+        guard !settings.gradientColors.isEmpty else { return "Click Colors and add a color to the pad. Until then the text keeps its plain color." }
+        let unit = settings.gradientStyle == .perWord ? "word" : "character"
+        switch settings.gradientStyle {
+        case .whole:
+            return settings.gradientAnchor == .screen
+                ? "One big gradient fills the screen behind the text, and only shows through the letters. Scrolling letters pass over its colors."
+                : "One gradient is stretched over the text and moves along with it."
+        case .perCharacter, .perWord:
+            return settings.gradientRepeats
+                ? "Each \(unit) has one color. There are \(settings.gradientShadesBetween) in-between shades from one chosen color to the next, then the colors start over."
+                : "Each \(unit) has one color, spread once from the first color to the last over all the text."
+        }
     }
 
     /// Shown only while scrolling is on: pan or rise, which way, how fast and how big.
@@ -99,6 +213,8 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+
+                Toggle("Keep rows", isOn: settings.$panKeepsRows)
             case .rise:
                 Picker("Direction", selection: settings.$riseDirection) {
                     ForEach(RiseDirection.allCases) { direction in
@@ -125,7 +241,9 @@ struct SettingsView: View {
             Text("Scrolling")
         } footer: {
             Text(settings.motion == .pan
-                 ? "Pan runs the text along one line. At 100% it's as tall as the screen allows."
+                 ? (settings.panKeepsRows
+                    ? "Each row pans on its own line, all at the same time. Start a new row with \(newRowKey). At 100% the rows together are as tall as the screen allows."
+                    : "Pan runs the text along one line, joining the rows. At 100% it's as tall as the screen allows.")
                  : "Rise wraps the text to the screen width. At 100%, the longest word just fits across the screen.")
         }
     }
@@ -161,6 +279,15 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    /// The key that starts a new row in the text box.
+    private var newRowKey: String {
+        #if os(macOS)
+        "Shift-Return"
+        #else
+        "Return"
+        #endif
     }
 
     private var layoutFooter: String {
@@ -223,7 +350,7 @@ struct SettingsView: View {
                     .confirmationDialog("Load the default settings?", isPresented: $isConfirmingDefaults) {
                         Button("Load Defaults", role: .destructive) { settings.loadDefaults() }
                     } message: {
-                        Text("The font, color, size and scrolling settings go back to how the app first starts, and all saved colors are removed. Your saved slots are kept.")
+                        Text("The font, color, gradient, size and scrolling settings go back to how the app first starts, and all saved colors are removed. Your saved slots are kept.")
                     }
             }
             .buttonStyle(.bordered)
@@ -266,7 +393,7 @@ struct SettingsView: View {
         } header: {
             Text("Saved Settings")
         } footer: {
-            Text("Save keeps a copy of the current font, color, saved colors, size and scrolling settings. Load brings them back.")
+            Text("Save keeps a copy of the current font, color, saved colors, gradient, size and scrolling settings. Load brings them back.")
         }
     }
 
@@ -317,6 +444,9 @@ private struct FontPicker: View {
 
 /// Opens the settings: the Settings window on macOS, or a sheet on iPhone and iPad.
 struct SettingsButton<Label: View>: View {
+    /// Mac only: when set, the button calls this instead of opening the Settings window, so the
+    /// settings can be shown inside the current window (used in full screen).
+    var openInWindow: (() -> Void)? = nil
     @ViewBuilder var label: () -> Label
 
     #if !os(macOS)
@@ -325,7 +455,11 @@ struct SettingsButton<Label: View>: View {
 
     var body: some View {
         #if os(macOS)
-        SettingsLink(label: label)
+        if let openInWindow {
+            Button(action: openInWindow, label: label)
+        } else {
+            SettingsLink(label: label)
+        }
         #else
         Button(action: { isPresented = true }, label: label)
             .keyboardShortcut(",", modifiers: .command) // ⌘, on an iPad keyboard, as on the Mac
@@ -343,6 +477,51 @@ struct SettingsButton<Label: View>: View {
         #endif
     }
 }
+
+#if os(macOS)
+/// The settings shown as a sheet on the main window, used while it's full screen. In full screen the
+/// separate Settings window would open on another Space, away from the text.
+struct SettingsSheet: View {
+    var windowHeight: CGFloat
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            SettingsView()
+                .frame(height: max(300, min(620, windowHeight - 140)))
+            Divider()
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(12)
+        }
+    }
+}
+
+extension Notification.Name {
+    /// Asks the window passed as the object to show the settings inside itself.
+    static let showSettingsInWindow = Notification.Name("showSettingsInWindow")
+}
+
+/// App menu ▸ Settings… (⌘,). Opens the Settings window, except when the front window is full
+/// screen: then the settings open inside that window.
+struct SettingsMenuItem: View {
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Button("Settings…") {
+            if let window = NSApp.keyWindow ?? NSApp.mainWindow, window.styleMask.contains(.fullScreen) {
+                NotificationCenter.default.post(name: .showSettingsInWindow, object: window)
+            } else {
+                openSettings()
+            }
+        }
+        .keyboardShortcut(",", modifiers: .command)
+    }
+}
+#endif
 
 #Preview {
     SettingsView()

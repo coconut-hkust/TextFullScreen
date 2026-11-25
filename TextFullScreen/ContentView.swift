@@ -11,6 +11,10 @@ struct ContentView: View {
     @FocusState private var isFocused: Bool
     #if os(macOS)
     @State private var isFullScreen: Bool = false
+    /// The settings shown inside this window, as they are while it's full screen.
+    @State private var isSettingsSheetShown = false
+    @State private var hostWindow: NSWindow?
+    @State private var windowHeight: CGFloat = 600
     #else
     @State private var isFullScreen: Bool = true // iPhone and iPad apps always fill the screen, so they get the full-screen look
     #endif
@@ -23,7 +27,7 @@ struct ContentView: View {
             // 1. Background Handling
             Group {
                 if isFullScreen {
-                    Color.white
+                    settings.appScheme == .dark ? Color(white: 0.075) : Color.white
                 } else {
                     ZStack {
                         // "Liquid Glass" Transparent Effect
@@ -63,7 +67,9 @@ struct ContentView: View {
                             weight: settings.weight,
                             direction: settings.scrollDirection,
                             speed: settings.scrollSpeed,
-                            sizeScale: settings.scrollSizeInUse
+                            sizeScale: settings.scrollSizeInUse,
+                            keepsRows: settings.panKeepsRows,
+                            gradient: settings.gradient
                         )
                         .id(settings.scrollDirection) // Start again from the edge when the direction changes
                         .foregroundColor(settings.color.color)
@@ -77,7 +83,8 @@ struct ContentView: View {
                             font: settings.font,
                             weight: settings.weight,
                             fill: CGFloat(settings.fillPercent) / 100,
-                            color: settings.color.color
+                            color: settings.color.color,
+                            gradient: settings.gradient
                         )
                             .frame(width: geometry.size.width, height: geometry.size.height)
                             .contentShape(Rectangle())
@@ -85,8 +92,9 @@ struct ContentView: View {
                     }
                 }
             }
-            // On the white full-screen background, use Light Mode colors even in Dark Mode
-            .environment(\.colorScheme, isFullScreen ? .light : colorScheme)
+            // On the white full-screen background, use Light Mode colors even in Dark Mode, unless
+            // the appearance is set to Light or Dark on the color pad
+            .environment(\.colorScheme, textColorScheme)
 
             // 3. The Floating Glass Input Panel
             if isInputVisible {
@@ -132,7 +140,7 @@ struct ContentView: View {
                         }
 
                         // Settings Button (font, scrolling)
-                        SettingsButton {
+                        SettingsButton(openInWindow: settingsInWindowAction) {
                             Image(systemName: "gearshape.fill")
                                 .font(.system(size: 20))
                                 .foregroundColor(.secondary)
@@ -161,6 +169,7 @@ struct ContentView: View {
                 .zIndex(2)
             }
         }
+        .preferredColorScheme(settings.appScheme.colorScheme)
         #if os(macOS)
         .frame(minWidth: 800, minHeight: 600)
         // Style this view's own window. (NSApp.windows.first could be the Settings window.)
@@ -169,16 +178,41 @@ struct ContentView: View {
             window.backgroundColor = .clear
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
+            DispatchQueue.main.async { hostWindow = window }
 
-            // Initial check
-            let startsFullScreen = window.styleMask.contains(.fullScreen)
-            DispatchQueue.main.async { isFullScreen = startsFullScreen }
+            // Initial check. A window brought back in full screen when the app reopens only becomes
+            // full screen a moment later, and gets no "did enter" notice, so look again shortly after.
+            for delay in [0.0, 0.5, 1.5] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak window] in
+                    guard let window else { return }
+                    let fullScreen = window.styleMask.contains(.fullScreen)
+                    if fullScreen != isFullScreen { isFullScreen = fullScreen }
+                }
+            }
         })
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in
             withAnimation { isFullScreen = true }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in
             withAnimation { isFullScreen = false }
+        }
+        // A window the system brings back in full screen (when the app reopens) gets no "did enter"
+        // notice, so check again whenever this window changes size or comes to the front.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResizeNotification)) { note in
+            recheckFullScreen(note)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
+            recheckFullScreen(note)
+        }
+        // ⌘, while this window is full screen
+        .onReceive(NotificationCenter.default.publisher(for: .showSettingsInWindow)) { note in
+            if let window = note.object as? NSWindow, window === hostWindow {
+                isSettingsSheetShown = true
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { windowHeight = $0 }
+        .sheet(isPresented: $isSettingsSheetShown) {
+            SettingsSheet(windowHeight: windowHeight)
         }
         #else
         // Use the whole screen: no status bar, and the home indicator fades when not in use
@@ -187,6 +221,32 @@ struct ContentView: View {
         #endif
     }
     
+    #if os(macOS)
+    private func recheckFullScreen(_ note: Notification) {
+        guard let window = note.object as? NSWindow, window === hostWindow else { return }
+        let fullScreen = window.styleMask.contains(.fullScreen)
+        if fullScreen != isFullScreen { isFullScreen = fullScreen }
+    }
+    #endif
+
+    private var textColorScheme: ColorScheme {
+        switch settings.appScheme {
+        case .auto: isFullScreen ? .light : colorScheme
+        case .light: .light
+        case .dark: .dark
+        }
+    }
+
+    /// In full screen the settings open inside this window; otherwise in the Settings window.
+    private var settingsInWindowAction: (() -> Void)? {
+        #if os(macOS)
+        let windowIsFullScreen = isFullScreen || hostWindow?.styleMask.contains(.fullScreen) == true
+        return windowIsFullScreen ? { isSettingsSheetShown = true } : nil
+        #else
+        nil
+        #endif
+    }
+
     // Dynamic height calculation for the input box
     private var inputFrameHeight: CGFloat {
         let lineCount = text.filter { $0 == "\n" }.count + 1

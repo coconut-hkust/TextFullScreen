@@ -54,6 +54,73 @@ struct DisplaySettings: nonisolated DynamicProperty {
     @AppStorage("scrollTextSize") var scrollTextSize = 1.0
     /// Off: scrolling text uses the same Maximum size as fitted text. On: it has its own (`scrollTextSize`).
     @AppStorage("separateScrollSize") var separateScrollSize = false
+    /// Pan: On keeps each row on its own line, all panning together. Off joins the rows into one line.
+    @AppStorage("panKeepsRows") var panKeepsRows = false
+
+    // MARK: Gradient
+
+    /// On: the text is painted with the gradient below instead of the single text color.
+    @AppStorage("gradientEnabled") var gradientEnabled = false
+    @AppStorage("gradientStyle") var gradientStyle: GradientStyle = .whole
+    @AppStorage("gradientAnchor") var gradientAnchor: GradientAnchor = .screen
+    @AppStorage("gradientDirection") var gradientDirection: GradientDirection = .blend
+    @AppStorage("gradientRepeats") var gradientRepeats = false
+    @AppStorage("gradientShadesBetween") var gradientShadesBetween = 3
+    /// The gradient's colors in order, stored like `colorSlots`. Empty means the default colors;
+    /// "none" means every color was removed from the pad.
+    @AppStorage("gradientColors") private var gradientColorsRaw = ""
+
+    var gradientColors: [TextColor] {
+        get { Self.gradientColors(from: gradientColorsRaw) }
+        nonmutating set {
+            gradientColorsRaw = newValue.isEmpty ? "none" : newValue.map(\.rawValue).joined(separator: ";")
+        }
+    }
+
+    nonisolated static func gradientColors(from raw: String) -> [TextColor] {
+        if raw == "none" { return [] }
+        let colors = raw.split(separator: ";").compactMap { TextColor(rawValue: String($0)) }
+        return colors.isEmpty ? TextGradient.defaultColors : colors
+    }
+
+    /// The color pad's dots, stored as JSON next to the colors they make.
+    @AppStorage("gradientPad") private var gradientPadRaw = ""
+    /// The pad's wave slider, 0...1.
+    @AppStorage("gradientOpacity") var gradientOpacity = GradientOpacity.standard
+    @AppStorage("gradientTexture") var gradientTexture: GradientTexture = .grain
+    /// The texture dial, 0...1 in sixteenths. 0 shows no texture.
+    @AppStorage("gradientTextureAmount") var gradientTextureAmount = 0.0
+    /// The appearance buttons at the top of the pad.
+    @AppStorage("appScheme") var appScheme: AppScheme = .auto
+
+    /// The color pad. Writing it also writes the gradient's colors. When the stored colors were
+    /// changed another way (an older version, a saved slot), the pad is rebuilt from them.
+    var gradientPad: ColorPadState {
+        get {
+            let colors = gradientColors
+            if let pad = ColorPadState.decode(gradientPadRaw), pad.colors.map(\.rawValue) == colors.map(\.rawValue) {
+                return pad
+            }
+            return ColorPadState(colors: colors)
+        }
+        nonmutating set {
+            gradientPadRaw = newValue.json
+            gradientColors = newValue.colors
+        }
+    }
+
+    /// The gradient to paint the text with, or nil while gradients are off.
+    var gradient: TextGradient? {
+        let pad = gradientPad
+        let colors = pad.colors
+        guard gradientEnabled, !colors.isEmpty else { return nil }
+        return TextGradient(
+            colors: colors, style: gradientStyle, anchor: gradientAnchor,
+            direction: gradientDirection, repeats: gradientRepeats, shadesBetween: gradientShadesBetween,
+            opacity: gradientOpacity, texture: gradientTexture, textureAmount: gradientTextureAmount,
+            usesCustomColors: !pad.customColors.isEmpty
+        )
+    }
 
     /// The size scrolling text is drawn at, as a fraction of the largest that fits.
     var scrollSizeInUse: Double {
@@ -89,8 +156,14 @@ struct DisplaySettings: nonisolated DynamicProperty {
             fillPercent: fillPercent, scrollEnabled: scrollEnabled, motion: motion.rawValue,
             panDirection: panDirection.rawValue, riseDirection: riseDirection.rawValue,
             scrollSpeed: scrollSpeed, scrollTextSize: scrollTextSize,
-            separateScrollSize: separateScrollSize,
-            colorSlots: Self.rawValue(of: colorSlots)
+            separateScrollSize: separateScrollSize, panKeepsRows: panKeepsRows,
+            colorSlots: Self.rawValue(of: colorSlots),
+            gradientEnabled: gradientEnabled, gradientStyle: gradientStyle.rawValue,
+            gradientAnchor: gradientAnchor.rawValue, gradientDirection: gradientDirection.rawValue,
+            gradientRepeats: gradientRepeats, gradientShadesBetween: gradientShadesBetween,
+            gradientColors: gradientColorsRaw,
+            gradientPad: gradientPadRaw, gradientOpacity: gradientOpacity, gradientTexture: gradientTexture.rawValue,
+            gradientTextureAmount: gradientTextureAmount, appScheme: appScheme.rawValue
         )
         guard let data = try? JSONEncoder().encode(current) else { return }
         setSlotJSON(String(decoding: data, as: UTF8.self), slot)
@@ -111,8 +184,22 @@ struct DisplaySettings: nonisolated DynamicProperty {
         scrollTextSize = saved.scrollTextSize
         // Slots saved before this choice existed kept the two sizes apart
         separateScrollSize = saved.separateScrollSize ?? true
+        panKeepsRows = saved.panKeepsRows ?? false
         // Slots saved before colors were included leave the saved colors as they are
         if let raw = saved.colorSlots { colorSlots = Self.colorSlots(from: raw) }
+        // Slots saved before gradients existed had none
+        gradientEnabled = saved.gradientEnabled ?? false
+        if let value = saved.gradientStyle.flatMap(GradientStyle.init(rawValue:)) { gradientStyle = value }
+        if let value = saved.gradientAnchor.flatMap(GradientAnchor.init(rawValue:)) { gradientAnchor = value }
+        if let value = saved.gradientDirection.flatMap(GradientDirection.init(rawValue:)) { gradientDirection = value }
+        if let value = saved.gradientRepeats { gradientRepeats = value }
+        if let value = saved.gradientShadesBetween { gradientShadesBetween = value }
+        if let value = saved.gradientColors { gradientColorsRaw = value }
+        if let value = saved.gradientPad { gradientPadRaw = value }
+        if let value = saved.gradientOpacity { gradientOpacity = value }
+        if let value = saved.gradientTexture.flatMap(GradientTexture.init(rawValue:)) { gradientTexture = value }
+        if let value = saved.gradientTextureAmount { gradientTextureAmount = value }
+        if let value = saved.appScheme.flatMap(AppScheme.init(rawValue:)) { appScheme = value }
     }
 
     /// Puts every setting back to how the app first starts, and removes all saved colors.
@@ -130,6 +217,19 @@ struct DisplaySettings: nonisolated DynamicProperty {
         scrollSpeed = 1
         scrollTextSize = 1
         separateScrollSize = false
+        panKeepsRows = false
+        gradientEnabled = false
+        gradientStyle = .whole
+        gradientAnchor = .screen
+        gradientDirection = .blend
+        gradientRepeats = false
+        gradientShadesBetween = 3
+        gradientColorsRaw = ""
+        gradientPadRaw = ""
+        gradientOpacity = GradientOpacity.standard
+        gradientTexture = .grain
+        gradientTextureAmount = 0
+        appScheme = .auto
     }
 
     func clear(slot: Int) {
@@ -172,9 +272,24 @@ nonisolated struct SavedSettings: Codable, Sendable {
     var scrollTextSize: Double
     /// Nil in slots saved before this choice existed.
     var separateScrollSize: Bool?
+    /// Nil in slots saved before this choice existed.
+    var panKeepsRows: Bool?
     /// The saved colors, in the same form as `DisplaySettings.colorSlots`. Nil in slots saved
     /// before colors were included.
     var colorSlots: String?
+    // Gradient settings; all nil in slots saved before gradients existed.
+    var gradientEnabled: Bool?
+    var gradientStyle: String?
+    var gradientAnchor: String?
+    var gradientDirection: String?
+    var gradientRepeats: Bool?
+    var gradientShadesBetween: Int?
+    var gradientColors: String?
+    var gradientPad: String?
+    var gradientOpacity: Double?
+    var gradientTexture: String?
+    var gradientTextureAmount: Double?
+    var appScheme: String?
 
     /// How many saved colors the slot holds, if it holds them.
     var savedColorCount: Int? {
@@ -189,7 +304,10 @@ nonisolated struct SavedSettings: Codable, Sendable {
             ? (ScrollMotion(rawValue: motion)?.displayName ?? "Scroll")
             : "\(fillPercent)%"
         let colors = savedColorCount.map { $0 == 1 ? "1 color" : "\($0) colors" } ?? ""
-        return [fontName, weightName, layout, colors].filter { !$0.isEmpty }.joined(separator: " · ")
+        let gradient = gradientEnabled == true
+            ? (GradientStyle(rawValue: gradientStyle ?? "")?.displayName ?? "Gradient") + " gradient"
+            : ""
+        return [fontName, weightName, layout, gradient, colors].filter { !$0.isEmpty }.joined(separator: " · ")
     }
 }
 

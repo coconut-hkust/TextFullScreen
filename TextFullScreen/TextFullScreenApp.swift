@@ -14,6 +14,10 @@ struct TextFullScreenApp: App {
         }
         #if os(macOS)
         .windowStyle(HiddenTitleBarWindowStyle()) // Modern frameless look
+        .commands {
+            // ⌘, opens the settings inside the window when it's full screen
+            CommandGroup(replacing: .appSettings) { SettingsMenuItem() }
+        }
         #endif
 
         #if os(macOS)

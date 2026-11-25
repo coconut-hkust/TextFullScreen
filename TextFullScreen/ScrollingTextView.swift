@@ -16,6 +16,11 @@ struct ScrollingTextView: View {
     let speed: Double
     /// Fraction of the largest size that fits on screen; 1 is the largest.
     let sizeScale: Double
+    /// Pan only: keep each row on its own line, all panning across together, instead of joining
+    /// the rows into one long line.
+    var keepsRows = false
+    /// Paints the text with a gradient when set. The plain color comes from `foregroundColor`.
+    var gradient: TextGradient? = nil
 
     @Environment(\.fontResolutionContext) private var fontContext
     /// The laid-out size of the moving text, which sets how far it travels before starting over.
@@ -33,19 +38,30 @@ struct ScrollingTextView: View {
         GeometryReader { proxy in
             let screen = proxy.size
             let fontSize = fittedFontSize(in: screen)
-            let displayText = direction.isHorizontal ? singleLine(text) : text
+            let displayText = direction.isHorizontal && !keepsRows ? singleLine(text) : text
             let pointsPerSecond = speed * emsPerSecond * fontSize
             let loopLength = direction.isHorizontal
                 ? screen.width + textSize.width
                 : screen.height + textSize.height
 
+            let styled = styledText(displayText)
+
             TimelineView(.animation) { timeline in
                 let travelled = clock.distance(at: timeline.date, speed: pointsPerSecond, loopLength: loopLength)
-
-                movingText(displayText, fontSize: fontSize, screenWidth: screen.width)
+                let placed = movingText(styled, fontSize: fontSize, screenWidth: screen.width)
                     .onGeometryChange(for: CGSize.self) { $0.size } action: { textSize = $0 }
                     .offset(offset(travelled: travelled, screen: screen))
                     .frame(width: screen.width, height: screen.height, alignment: frontEdge)
+
+                if let gradient, gradient.style == .whole, gradient.anchor == .screen {
+                    // A still gradient over the whole screen, seen only through the moving letters
+                    GradientFillView(gradient: gradient)
+                        .frame(width: screen.width, height: screen.height)
+                        .mask { placed.foregroundStyle(.black) }
+                        .opacity(gradient.alpha)
+                } else {
+                    placed
+                }
             }
         }
         .clipped()
@@ -53,20 +69,40 @@ struct ScrollingTextView: View {
         .accessibilityLabel(Text(verbatim: text))
     }
 
-    @ViewBuilder
-    private func movingText(_ string: String, fontSize: CGFloat, screenWidth: CGFloat) -> some View {
-        let font = font.font(size: fontSize, weight: weight)
-        if direction.isHorizontal {
-            Text(verbatim: string)
-                .font(font)
-                .lineLimit(1)
-                .fixedSize()
+    /// The text with each character or word colored, if the gradient does that.
+    private func styledText(_ string: String) -> Text {
+        if let gradient, gradient.style != .whole {
+            Text(gradient.attributedString(string))
         } else {
             Text(verbatim: string)
-                .font(font)
-                .multilineTextAlignment(.center)
-                .frame(width: screenWidth * (1 - 2 * sideMargin))
-                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private func movingText(_ text: Text, fontSize: CGFloat, screenWidth: CGFloat) -> some View {
+        let font = font.font(size: fontSize, weight: weight)
+        let laidOut = Group {
+            if direction.isHorizontal {
+                // Rows line up at the edge that enters first, so they arrive together
+                text
+                    .font(font)
+                    .lineLimit(keepsRows ? nil : 1)
+                    .multilineTextAlignment(direction == .right ? .trailing : .leading)
+                    .fixedSize()
+            } else {
+                text
+                    .font(font)
+                    .multilineTextAlignment(.center)
+                    .frame(width: screenWidth * (1 - 2 * sideMargin))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        if let gradient, gradient.style != .whole || gradient.anchor == .text {
+            // Stretched over the text itself, so it travels along with it (per character or word,
+            // this adds the texture and strength)
+            laidOut.textFill(gradient, plain: .primary)
+        } else {
+            laidOut
         }
     }
 
@@ -105,7 +141,8 @@ struct ScrollingTextView: View {
         let referenceSize: CGFloat = 100
         let reference = coreTextFont(size: referenceSize)
         let lineHeight = CTFontGetAscent(reference) + CTFontGetDescent(reference) + CTFontGetLeading(reference)
-        var largest = referenceSize * screen.height / lineHeight
+        // Kept rows share the screen height between them
+        var largest = referenceSize * screen.height / (lineHeight * CGFloat(panRowCount))
 
         if direction.isHorizontal {
             // On an iPhone held upright, a line as tall as the screen makes each letter wider than
@@ -173,6 +210,12 @@ struct ScrollingTextView: View {
         )
         let line = CTLineCreateWithAttributedString(attributed as CFAttributedString)
         return CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+    }
+
+    /// How many lines panning text takes up: its rows when they're kept, otherwise one.
+    private var panRowCount: Int {
+        guard direction.isHorizontal, keepsRows else { return 1 }
+        return max(1, text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).count)
     }
 
     /// Panning text runs on one line, so line breaks become spaces.

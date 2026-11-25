@@ -53,7 +53,9 @@ struct FillingTextView: View {
 
 // MARK: - Layout
 
-/// Text broken into centered lines at the largest size whose drawn glyphs fit the screen.
+/// Text in centered rows at the largest size whose drawn glyphs fit the screen. Rows break only
+/// where the text has a line break: a row that's too wide makes all the text smaller, it never
+/// wraps onto another row.
 private struct FittedLayout {
     struct Line {
         let ctLine: CTLine
@@ -71,7 +73,6 @@ private struct FittedLayout {
         guard screen.width > 1, screen.height > 1 else { return nil }
 
         let paragraphs = Self.paragraphs(of: text, colors: characterColors)
-        let runs = Self.widestUnbreakableRuns(in: text, font: makeFont(100))
 
         // The drawn size grows with the font size, so find the largest one that fits by bisection.
         var low: CGFloat = 1
@@ -80,7 +81,7 @@ private struct FittedLayout {
         for _ in 0..<26 {
             let size = (low + high) / 2
             let font = makeFont(size)
-            if let candidate = Self.layout(paragraphs, runs: runs, font: font, screen: screen) {
+            if let candidate = Self.layout(paragraphs, font: font, screen: screen) {
                 best = candidate
                 low = size
             } else {
@@ -97,7 +98,6 @@ private struct FittedLayout {
         self.inkBounds = inkBounds
     }
 
-    /// Lays the text out at `font`, or returns nil if it doesn't fit on screen.
     /// `text` split at line breaks, each piece carrying its characters' colors. Characters without
     /// a color take the drawing color.
     private static func paragraphs(of text: String, colors: [TextColor?]?) -> [NSAttributedString] {
@@ -124,12 +124,8 @@ private struct FittedLayout {
         return result
     }
 
-    private static func layout(_ paragraphs: [NSAttributedString], runs: [String], font: CTFont, screen: CGSize) -> FittedLayout? {
-        // Never split a word across lines just to make the text larger.
-        for run in runs where width(of: run, in: font) > screen.width {
-            return nil
-        }
-
+    /// Lays the text out at `font`, one row per line of text, or returns nil if it doesn't fit on screen.
+    private static func layout(_ paragraphs: [NSAttributedString], font: CTFont, screen: CGSize) -> FittedLayout? {
         let lineHeight = CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)
         let fontKey = NSAttributedString.Key(kCTFontAttributeName as String)
 
@@ -140,23 +136,16 @@ private struct FittedLayout {
         for paragraph in paragraphs {
             let withFont = NSMutableAttributedString(attributedString: paragraph)
             withFont.addAttribute(fontKey, value: font, range: NSRange(location: 0, length: withFont.length))
-            let typesetter = CTTypesetterCreateWithAttributedString(withFont as CFAttributedString)
-            let length = withFont.length
-            var start = 0
-            repeat {
-                let count = length == 0 ? 0 : CTTypesetterSuggestLineBreak(typesetter, start, Double(screen.width))
-                let ctLine = CTTypesetterCreateLine(typesetter, CFRange(location: start, length: count))
-                let advance = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil)) - CGFloat(CTLineGetTrailingWhitespaceWidth(ctLine))
-                let origin = CGPoint(x: -advance / 2, y: baseline) // Centered on x = 0
-                lines.append(Line(ctLine: ctLine, origin: origin))
+            let ctLine = CTLineCreateWithAttributedString(withFont as CFAttributedString)
+            let advance = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil)) - CGFloat(CTLineGetTrailingWhitespaceWidth(ctLine))
+            let origin = CGPoint(x: -advance / 2, y: baseline) // Centered on x = 0
+            lines.append(Line(ctLine: ctLine, origin: origin))
 
-                let glyphs = CTLineGetBoundsWithOptions(ctLine, .useGlyphPathBounds)
-                if !glyphs.isNull, !glyphs.isEmpty {
-                    ink = ink.union(glyphs.offsetBy(dx: origin.x, dy: origin.y))
-                }
-                baseline -= lineHeight
-                start += max(count, 1)
-            } while start < length
+            let glyphs = CTLineGetBoundsWithOptions(ctLine, .useGlyphPathBounds)
+            if !glyphs.isNull, !glyphs.isEmpty {
+                ink = ink.union(glyphs.offsetBy(dx: origin.x, dy: origin.y))
+            }
+            baseline -= lineHeight
         }
 
         guard !ink.isNull else { return nil } // Only whitespace: nothing to draw
@@ -225,38 +214,6 @@ private struct FittedLayout {
             CTLineDraw(line.ctLine, cg)
         }
         cg.restoreGState()
-    }
-
-    // MARK: Measuring
-
-    /// The widest pieces of text a line can't be broken inside (usually words), measured at
-    /// `font`. Only the few widest matter for whether the text fits.
-    private static func widestUnbreakableRuns(in text: String, font: CTFont) -> [String] {
-        let string = text as NSString
-        let range = CFRange(location: 0, length: string.length)
-        guard let tokenizer = CFStringTokenizerCreate(nil, string, range, kCFStringTokenizerUnitLineBreak, nil) else { return [] }
-
-        var runs = Set<String>()
-        while CFStringTokenizerAdvanceToNextToken(tokenizer) != [] {
-            let tokenRange = CFStringTokenizerGetCurrentTokenRange(tokenizer)
-            let run = string.substring(with: NSRange(location: tokenRange.location, length: tokenRange.length))
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if !run.isEmpty { runs.insert(run) }
-        }
-        return runs
-            .map { (run: $0, width: width(of: $0, in: font)) }
-            .sorted { $0.width > $1.width }
-            .prefix(5)
-            .map(\.run)
-    }
-
-    private static func width(of string: String, in font: CTFont) -> CGFloat {
-        let attributed = NSAttributedString(
-            string: string,
-            attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font]
-        )
-        let line = CTLineCreateWithAttributedString(attributed as CFAttributedString)
-        return CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
     }
 }
 

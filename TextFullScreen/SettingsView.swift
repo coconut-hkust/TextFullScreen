@@ -39,7 +39,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Saved Colors")
                     SavedColorsView()
-                    Text("Click + to save the current color. To remove one, right-click it, or drag it away from its spot and let go. These are the same colors as in the color pad.")
+                    Text(savedColorsHint)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -291,6 +291,16 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    /// How to save and remove colors, in the words of the device: click and right-click on the
+    /// Mac, tap and touch and hold on iPhone and iPad (where a drag scrolls the row instead).
+    private var savedColorsHint: String {
+        #if os(macOS)
+        "Click + to save the current color. To remove one, right-click it, or drag it away from its spot and let go. These are the same colors as in the color pad."
+        #else
+        "Tap + to save the current color. To remove one, touch and hold it, then tap Remove Colour. These are the same colors as in the color pad."
+        #endif
     }
 
     /// The key that starts a new row in the text box.

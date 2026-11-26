@@ -23,9 +23,10 @@ struct TextFullScreenApp: App {
                 Button("About TextFullScreen") { showAboutPanel() }
             }
 
-            // Help ▸ Get Support opens the app's GitHub page
+            // Help ▸ Get Support opens the app's GitHub page; Send Feedback opens the feedback form
             CommandGroup(replacing: .help) {
                 Link("Get Support", destination: supportURL)
+                Link("Send Feedback", destination: feedbackURL)
             }
         }
         #endif
@@ -43,6 +44,15 @@ struct TextFullScreenApp: App {
 
 /// Where people get help with the app: its GitHub page.
 let supportURL = URL(string: "https://github.com/coconut-hkust/TextFullScreen")!
+
+/// The app's licence text on GitHub.
+let licenseURL = URL(string: "https://github.com/coconut-hkust/TextFullScreen/blob/main/LICENSE.md")!
+
+/// The developer's GitHub profile.
+let developerURL = URL(string: "https://github.com/coconut-hkust")!
+
+/// Where people send ideas and problems: the TextFullScreen Feedback Google Form.
+let feedbackURL = URL(string: "https://docs.google.com/forms/d/e/1FAIpQLSedmBLQH6dR3TXbgIk9d6yJqk8UNzXldvfZYBfv9NcqmSQ2CA/viewform")!
 
 #if os(macOS)
 import AppKit

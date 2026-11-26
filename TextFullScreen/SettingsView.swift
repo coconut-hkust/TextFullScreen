@@ -77,6 +77,8 @@ struct SettingsView: View {
             droppedTextSection
 
             savedSection
+
+            aboutSection
         }
         .formStyle(.grouped)
         .preferredColorScheme(settings.appScheme.colorScheme)
@@ -497,6 +499,46 @@ struct SettingsView: View {
         } footer: {
             Text("Save keeps a copy of the current font, color, saved colors, gradient, size and moving settings. Load brings them back. The wallpaper is kept apart and doesn't change.")
         }
+    }
+
+    /// The app's version, where its code lives, its licence, who made it and where to send ideas.
+    private var aboutSection: some View {
+        Section {
+            LabeledContent("Version", value: appVersion)
+
+            aboutLink("Source Code on GitHub", systemImage: "chevron.left.forwardslash.chevron.right", url: supportURL)
+            aboutLink("Licence: PolyForm Noncommercial 1.0.0", systemImage: "doc.text", url: licenseURL)
+            aboutLink("Developer: coconut-hkust", systemImage: "person.crop.circle", url: developerURL)
+            aboutLink("Send Feedback or Ideas", systemImage: "lightbulb", url: feedbackURL)
+        } header: {
+            Text("About")
+        } footer: {
+            Text("Copyright 2026 coconut-hkust. Free for noncommercial use; commercial use needs permission from the author. Feedback opens a short Google Form; no account needed.")
+        }
+    }
+
+    private func aboutLink(_ title: String, systemImage: String, url: URL) -> some View {
+        Link(destination: url) {
+            HStack {
+                Label(title, systemImage: systemImage)
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(url.absoluteString)
+    }
+
+    /// For example "1.010 (10)", from the app's Info.plist.
+    private var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(version) (\(build))"
     }
 
     /// The speed slider moves on a doubling scale, so the middle of the track is normal speed,

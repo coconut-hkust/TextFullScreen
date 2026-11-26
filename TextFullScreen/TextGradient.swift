@@ -112,6 +112,15 @@ nonisolated struct TextGradient: Hashable, Sendable {
     var textureAmount: Double = 0
     /// True when the pad has custom colors; then a blend becomes a plain slanted gradient of all the colors.
     var usesCustomColors = false
+    /// Set while the text stays still and the gradient flows through it, the way it flows.
+    var flowDirection: ScrollDirection? = nil
+    /// How far the gradient has flowed, in seconds at normal speed. Only used with `flowDirection`.
+    var flow: Double = 0
+
+    /// A flowing whole-text gradient goes once round its colors in this many seconds at normal speed.
+    static let secondsPerLoop = 4.0
+    /// A flowing repeated gradient moves on by this many characters or words a second at normal speed.
+    static let piecesPerSecond = 3.0
 
     /// How opaque the whole text is drawn.
     var alpha: Double { GradientOpacity.alpha(opacity) }
@@ -171,12 +180,63 @@ nonisolated struct TextGradient: Hashable, Sendable {
         return layers
     }
 
+    // MARK: Flowing
+
+    /// Moving toward the left or the top counts as forward: each piece takes the color of the one
+    /// after it.
+    private var flowSign: Double {
+        switch flowDirection {
+        case .left, .up: 1
+        case .right, .down: -1
+        case nil: 0
+        }
+    }
+
+    /// How far round its colors a flowing whole-text gradient has gone, 0..<1.
+    var flowFraction: Double {
+        let loops = flow / Self.secondsPerLoop
+        return loops - loops.rounded(.down)
+    }
+
+    /// Stops running through every color and back to the first, so tiles of it join without a seam.
+    var loopingStops: [GradientLayer.Stop] {
+        let steps = max(12, colors.count * 8)
+        return (0...steps).map { i in
+            let t = Double(i) / Double(steps)
+            return .init(color: loopingColor(at: t * Double(colors.count)), location: t)
+        }
+    }
+
+    /// The color `position` colors along a loop that runs through all of them and back to the
+    /// first; 0 is the first color, 1 the second, and `colors.count` the first again.
+    func loopingColor(at position: Double) -> TextColor {
+        guard let first = colors.first else { return .black }
+        guard colors.count > 1 else { return first }
+        let n = Double(colors.count)
+        let wrapped = position - (position / n).rounded(.down) * n
+        let segment = Int(wrapped.rounded(.down)) % colors.count
+        return colors[segment].mixed(with: colors[(segment + 1) % colors.count], by: wrapped - wrapped.rounded(.down))
+    }
+
+    /// The color of a piece while the gradient flows: the colors keep going round, so they loop
+    /// back to the first instead of stopping at the last.
+    private func flowingColor(ofPiece index: Int, count: Int) -> TextColor {
+        if repeats {
+            let shifted = Double(index) + flowSign * flow * Self.piecesPerSecond
+            return loopingColor(at: shifted / Double(shadesBetween + 1))
+        } else {
+            let t = Double(index) / Double(max(count, 1)) + flowSign * flow / Self.secondsPerLoop
+            return loopingColor(at: t * Double(colors.count))
+        }
+    }
+
     // MARK: Colors for each character or word
 
     /// The color of piece `index` (a character or word) out of `count` pieces.
     func color(ofPiece index: Int, count: Int) -> TextColor {
         guard let first = colors.first else { return .black }
         guard colors.count > 1 else { return first }
+        if flowDirection != nil { return flowingColor(ofPiece: index, count: count) }
 
         if repeats {
             // Each chosen color is `shadesBetween + 1` pieces from the next, and after the last

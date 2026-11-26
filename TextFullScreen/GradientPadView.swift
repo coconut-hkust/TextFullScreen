@@ -9,6 +9,8 @@ import SwiftUI
 /// the third button steps through the harmonies.
 struct GradientPadView: View {
     private var settings = DisplaySettings()
+    /// Which gradient the pad edits: the text's or the wallpaper's.
+    var target: ColorPadTarget = .text
     @Environment(\.colorScheme) private var colorScheme
 
     /// The pad as being edited; saved to the settings on every change.
@@ -29,18 +31,23 @@ struct GradientPadView: View {
             padView
             swatchRow
             HStack(spacing: 14) {
-                WaveSlider(value: settings.$gradientOpacity)
-                TextureDial(texture: settings.$gradientTexture, amount: settings.$gradientTextureAmount)
+                if target == .wallpaper {
+                    WaveSlider(value: settings.$wallpaperGradientOpacity)
+                    TextureDial(texture: settings.$wallpaperGradientTexture, amount: settings.$wallpaperGradientTextureAmount)
+                } else {
+                    WaveSlider(value: settings.$gradientOpacity)
+                    TextureDial(texture: settings.$gradientTexture, amount: settings.$gradientTextureAmount)
+                }
             }
             .padding(.horizontal, 4)
             customColors
         }
         .padding(16)
         .frame(width: padSize + 32)
-        .onAppear { pad = settings.gradientPad }
-        .onChange(of: settings.gradientColors) { _, colors in
+        .onAppear { pad = storedPad }
+        .onChange(of: storedPad.colors.map(\.rawValue)) { _, colors in
             // Only re-read when the colors were changed somewhere else (e.g. a slot was loaded)
-            if colors.map(\.rawValue) != pad.colors.map(\.rawValue) { pad = settings.gradientPad }
+            if colors != pad.colors.map(\.rawValue) { pad = storedPad }
         }
     }
 
@@ -320,7 +327,15 @@ struct GradientPadView: View {
         if degrees < 0 { degrees += 360 }
         // Right at the middle the angle means nothing, so the old one is kept
         pad.moveMain(hue: hypot(dx, dy) > 1 ? degrees : nil, distance: hypot(dx, dy) / radius)
-        settings.gradientPad = pad
+        storedPad = pad
+    }
+
+    /// The pad as saved: the text's gradient or the wallpaper's.
+    private var storedPad: ColorPadState {
+        get { target == .wallpaper ? settings.wallpaperGradientPad : settings.gradientPad }
+        nonmutating set {
+            if target == .wallpaper { settings.wallpaperGradientPad = newValue } else { settings.gradientPad = newValue }
+        }
     }
 
     private func makeMain(_ index: Int) {
@@ -329,7 +344,7 @@ struct GradientPadView: View {
 
     private func edit(_ change: (inout ColorPadState) -> Void) {
         withAnimation(spring) { change(&pad) }
-        settings.gradientPad = pad
+        storedPad = pad
     }
 }
 

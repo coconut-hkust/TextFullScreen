@@ -56,6 +56,9 @@ struct DisplaySettings: nonisolated DynamicProperty {
     @AppStorage("separateScrollSize") var separateScrollSize = false
     /// Pan: On keeps each row on its own line, all panning together. Off joins the rows into one line.
     @AppStorage("panKeepsRows") var panKeepsRows = false
+    /// While scrolling with a gradient: whether the text moves, or the text stays still and the
+    /// gradient flows through it.
+    @AppStorage("scrollMover") var scrollMover: ScrollMover = .text
 
     // MARK: Gradient
 
@@ -109,6 +112,11 @@ struct DisplaySettings: nonisolated DynamicProperty {
         }
     }
 
+    /// True when the text stays still and its gradient flows through it instead.
+    var gradientMoves: Bool {
+        scrollEnabled && scrollMover == .gradient && gradient != nil
+    }
+
     /// The gradient to paint the text with, or nil while gradients are off.
     var gradient: TextGradient? {
         let pad = gradientPad
@@ -120,6 +128,102 @@ struct DisplaySettings: nonisolated DynamicProperty {
             opacity: gradientOpacity, texture: gradientTexture, textureAmount: gradientTextureAmount,
             usesCustomColors: !pad.customColors.isEmpty
         )
+    }
+
+    // MARK: Dropped text
+
+    /// On: Markdown dropped onto the main window (a .md file, or text that reads as Markdown) is
+    /// shown as plain text, without its # * _ ` > and other formatting symbols.
+    @AppStorage("dropConvertsMarkdown") var dropConvertsMarkdown = true
+
+    // MARK: Wallpaper
+
+    /// On: the chosen photo is shown behind the text instead of the plain (or glass) background.
+    @AppStorage("wallpaperEnabled") var wallpaperEnabled = false
+    /// The added photos and how each is cropped, newest first, stored as JSON. The pictures
+    /// themselves are files, see `WallpaperFiles`.
+    @AppStorage("wallpapers") private var wallpapersRaw = ""
+    /// The chosen photo's id, or empty.
+    @AppStorage("wallpaperID") var wallpaperID = ""
+
+    var wallpapers: [Wallpaper] {
+        get { (try? JSONDecoder().decode([Wallpaper].self, from: Data(wallpapersRaw.utf8))) ?? [] }
+        nonmutating set {
+            wallpapersRaw = (try? JSONEncoder().encode(newValue)).map { String(decoding: $0, as: UTF8.self) } ?? ""
+        }
+    }
+
+    /// A plain color wallpaper, chosen with the color pad.
+    @AppStorage("wallpaperColor") var wallpaperColor: TextColor = .white
+    /// A gradient wallpaper, chosen with the gradient pad: its dots as JSON, then the wave, texture
+    /// and direction, as for the text's gradient.
+    @AppStorage("wallpaperGradientPad") private var wallpaperGradientPadRaw = ""
+    @AppStorage("wallpaperGradientOpacity") var wallpaperGradientOpacity = GradientOpacity.standard
+    @AppStorage("wallpaperGradientTexture") var wallpaperGradientTexture: GradientTexture = .none
+    @AppStorage("wallpaperGradientTextureAmount") var wallpaperGradientTextureAmount = 0.0
+    @AppStorage("wallpaperGradientDirection") var wallpaperGradientDirection: GradientDirection = .blend
+
+    var wallpaperGradientPad: ColorPadState {
+        get { ColorPadState.decode(wallpaperGradientPadRaw) ?? .standard }
+        nonmutating set { wallpaperGradientPadRaw = newValue.json }
+    }
+
+    /// The gradient wallpaper as it's drawn, or nil while its pad has no colors.
+    var wallpaperGradient: TextGradient? {
+        let pad = wallpaperGradientPad
+        guard !pad.colors.isEmpty else { return nil }
+        return TextGradient(
+            colors: pad.colors, style: .whole, anchor: .screen, direction: wallpaperGradientDirection,
+            repeats: false, shadesBetween: 0, opacity: wallpaperGradientOpacity,
+            texture: wallpaperGradientTexture, textureAmount: wallpaperGradientTextureAmount,
+            usesCustomColors: !pad.customColors.isEmpty
+        )
+    }
+
+    /// Colors and gradients saved with Save Color or Save Gradient, newest first, stored as JSON.
+    @AppStorage("wallpaperFills") private var wallpaperFillsRaw = ""
+
+    var wallpaperFills: [WallpaperFill] {
+        get { (try? JSONDecoder().decode([WallpaperFill].self, from: Data(wallpaperFillsRaw.utf8))) ?? [] }
+        nonmutating set {
+            wallpaperFillsRaw = (try? JSONEncoder().encode(newValue)).map { String(decoding: $0, as: UTF8.self) } ?? ""
+        }
+    }
+
+    /// The Color or Gradient tile's current settings, as they'd be saved.
+    var currentFill: WallpaperFill? { fill(forTile: wallpaperID) }
+
+    /// The Color tile's (`WallpaperBackground.colorID`) or Gradient tile's settings, as they'd be saved.
+    func fill(forTile id: String) -> WallpaperFill? {
+        switch id {
+        case WallpaperBackground.colorID:
+            return WallpaperFill(color: wallpaperColor.rawValue)
+        case WallpaperBackground.gradientID:
+            return WallpaperFill(
+                gradientPad: wallpaperGradientPad.json, opacity: wallpaperGradientOpacity,
+                texture: wallpaperGradientTexture.rawValue, textureAmount: wallpaperGradientTextureAmount,
+                direction: wallpaperGradientDirection.rawValue
+            )
+        default:
+            return nil
+        }
+    }
+
+    /// The chosen photo, whether or not the wallpaper is switched on.
+    var selectedWallpaper: Wallpaper? {
+        wallpapers.first { $0.id.uuidString == wallpaperID }
+    }
+
+    /// What to show behind the text, or nil for the plain background.
+    var activeBackground: WallpaperBackground? {
+        guard wallpaperEnabled else { return nil }
+        switch wallpaperID {
+        case WallpaperBackground.colorID: return .color(wallpaperColor)
+        case WallpaperBackground.gradientID: return wallpaperGradient.map(WallpaperBackground.gradient)
+        default:
+            if let fill = wallpaperFills.first(where: { $0.id.uuidString == wallpaperID }) { return fill.background }
+            return selectedWallpaper.map(WallpaperBackground.photo)
+        }
     }
 
     /// The size scrolling text is drawn at, as a fraction of the largest that fits.
@@ -157,6 +261,7 @@ struct DisplaySettings: nonisolated DynamicProperty {
             panDirection: panDirection.rawValue, riseDirection: riseDirection.rawValue,
             scrollSpeed: scrollSpeed, scrollTextSize: scrollTextSize,
             separateScrollSize: separateScrollSize, panKeepsRows: panKeepsRows,
+            scrollMover: scrollMover.rawValue,
             colorSlots: Self.rawValue(of: colorSlots),
             gradientEnabled: gradientEnabled, gradientStyle: gradientStyle.rawValue,
             gradientAnchor: gradientAnchor.rawValue, gradientDirection: gradientDirection.rawValue,
@@ -185,6 +290,7 @@ struct DisplaySettings: nonisolated DynamicProperty {
         // Slots saved before this choice existed kept the two sizes apart
         separateScrollSize = saved.separateScrollSize ?? true
         panKeepsRows = saved.panKeepsRows ?? false
+        scrollMover = saved.scrollMover.flatMap(ScrollMover.init(rawValue:)) ?? .text
         // Slots saved before colors were included leave the saved colors as they are
         if let raw = saved.colorSlots { colorSlots = Self.colorSlots(from: raw) }
         // Slots saved before gradients existed had none
@@ -218,6 +324,7 @@ struct DisplaySettings: nonisolated DynamicProperty {
         scrollTextSize = 1
         separateScrollSize = false
         panKeepsRows = false
+        scrollMover = .text
         gradientEnabled = false
         gradientStyle = .whole
         gradientAnchor = .screen
@@ -230,6 +337,7 @@ struct DisplaySettings: nonisolated DynamicProperty {
         gradientTexture = .grain
         gradientTextureAmount = 0
         appScheme = .auto
+        dropConvertsMarkdown = true
     }
 
     func clear(slot: Int) {
@@ -274,6 +382,8 @@ nonisolated struct SavedSettings: Codable, Sendable {
     var separateScrollSize: Bool?
     /// Nil in slots saved before this choice existed.
     var panKeepsRows: Bool?
+    /// Nil in slots saved before this choice existed.
+    var scrollMover: String?
     /// The saved colors, in the same form as `DisplaySettings.colorSlots`. Nil in slots saved
     /// before colors were included.
     var colorSlots: String?
@@ -321,6 +431,7 @@ nonisolated struct TextColor: Hashable, Sendable, RawRepresentable {
     var opacity: Double = 1
 
     static let black = TextColor(red: 0, green: 0, blue: 0)
+    static let white = TextColor(red: 1, green: 1, blue: 1)
 
     var color: Color { Color(.sRGB, red: red, green: green, blue: blue, opacity: opacity) }
 
@@ -547,6 +658,23 @@ nonisolated enum RiseDirection: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .bottomToTop: "↑ Bottom to Top"
         case .topToBottom: "↓ Top to Bottom"
+        }
+    }
+}
+
+/// While scrolling with a gradient: what moves across the screen.
+nonisolated enum ScrollMover: String, CaseIterable, Identifiable, Sendable {
+    /// The text travels across the screen (the original behavior).
+    case text
+    /// The text stays still, filling the screen, and the gradient flows through the letters.
+    case gradient
+
+    var id: Self { self }
+
+    var displayName: String {
+        switch self {
+        case .text: "Text"
+        case .gradient: "Gradient"
         }
     }
 }

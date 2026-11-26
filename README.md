@@ -7,15 +7,17 @@ Runs on **iPhone, iPad and Mac** from one SwiftUI project.
 ## Features
 
 - **Fills the screen.** Text is sized by its drawn glyphs, so it uses as much of the screen as possible. A *Maximum size* setting (80–100%) leaves a margin.
-- **Moving.** Text can move across the screen like a banner instead of being fitted, with its own maximum size if you want one.
+- **Moving.** Text can move across the screen like a banner instead of being fitted, with its own maximum size if you want one. With a gradient, the text can stay still while the gradient flows through it.
 - **Fonts.** Pick from Apple fonts, classic fonts or all installed fonts, and choose a weight.
 - **Colours and gradients.** The app has its own colour pad, a grid of saved colours, and gradient text with direction, style and repeat options.
+- **Wallpaper.** Put a photo, a plain colour or a gradient behind the text. Photos are cropped and zoomed to your screen's shape; colours and gradients can be saved as tiles and downloaded as screen-sized pictures.
+- **Drop or paste text.** Drag text or a text file from another app onto the window to show it. Markdown can be turned into plain text automatically.
 - **Saved settings.** Three slots store a full look (font, colours, sizes), plus a Default Settings row.
 - **Liquid Glass app icon.**
 
 ## Download for Mac
 
-Needs macOS 26.1 or later. Runs on Apple silicon and Intel Macs.
+Needs macOS 26.1 or later and a Mac with Apple silicon. On an Intel Mac, use [version 1.004](https://github.com/coconut-hkust/TextFullScreen/releases/tag/v1.004), the last release that runs on Intel.
 
 1. Download the **TextFullScreen-v.1.xxx.zip** file (for example `TextFullScreen-v.1.000.zip`) from the [latest release](https://github.com/coconut-hkust/TextFullScreen/releases/latest) and double-click it to unzip.
 2. Drag **TextFullScreen** into your **Applications** folder.

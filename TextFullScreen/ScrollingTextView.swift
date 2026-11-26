@@ -245,6 +245,50 @@ private final class ScrollClock {
     }
 }
 
+/// Scrolling with the text kept still: the text fills the screen as it does without scrolling, and
+/// its gradient flows through the letters instead, the chosen way and at the chosen speed.
+struct FlowingGradientTextView: View {
+    let text: String
+    let font: TextFont
+    let weight: TextWeight
+    let direction: ScrollDirection
+    /// Multiplier on the base speed; 1 is normal.
+    let speed: Double
+    /// The share of the screen's width and height the text may fill at most.
+    let fill: CGFloat
+    let gradient: TextGradient
+
+    @State private var clock = FlowClock()
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            FillingTextView(text: text, font: font, weight: weight, fill: fill, gradient: flowing(at: timeline.date))
+        }
+    }
+
+    private func flowing(at date: Date) -> TextGradient {
+        var flowing = gradient
+        flowing.flowDirection = direction
+        flowing.flow = clock.flow(at: date, speed: speed)
+        return flowing
+    }
+}
+
+/// Adds up how far the gradient has flowed, frame by frame, so changing the speed never makes it jump.
+private final class FlowClock {
+    private var flow: Double = 0
+    private var lastFrame: Date?
+
+    func flow(at date: Date, speed: Double) -> Double {
+        if let lastFrame {
+            let elapsed = min(max(date.timeIntervalSince(lastFrame), 0), 1.0 / 15)
+            flow += speed * elapsed
+        }
+        lastFrame = date
+        return flow
+    }
+}
+
 #Preview("Pan") {
     ScrollingTextView(text: "Hello, world!", font: .standard, weight: .black, direction: .left, speed: 1, sizeScale: 1)
         .frame(width: 800, height: 500)

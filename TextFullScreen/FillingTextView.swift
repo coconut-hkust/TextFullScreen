@@ -179,7 +179,9 @@ private struct FittedLayout {
         cg.beginTransparencyLayer(auxiliaryInfo: nil)
         drawText(in: cg, canvasSize: canvasSize, color: CGColor(gray: 0, alpha: 1))
 
-        if gradient.style == .whole {
+        if gradient.style == .whole, let flow = gradient.flowDirection {
+            drawFlowingGradient(gradient, flow: flow, in: cg, area: area)
+        } else if gradient.style == .whole {
             for (index, layer) in gradient.layers.enumerated() {
                 guard let cgGradient = CGGradient(
                     colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
@@ -203,6 +205,41 @@ private struct FittedLayout {
             cg.restoreGState()
         }
         cg.endTransparencyLayer()
+    }
+
+    /// A gradient running through every color and back to the first, along the way it flows,
+    /// repeated end to end and slid along by how far it has flowed. Draws over the black letters
+    /// in the open transparency layer.
+    private func drawFlowingGradient(_ gradient: TextGradient, flow: ScrollDirection, in cg: CGContext, area: CGRect) {
+        let stops = gradient.loopingStops
+        guard area.width > 0, area.height > 0, let cgGradient = CGGradient(
+            colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
+            colors: stops.map(\.color.cgColor) as CFArray,
+            locations: stops.map { CGFloat($0.location) }
+        ) else { return }
+
+        let horizontal = flow.isHorizontal
+        let length = horizontal ? area.width : area.height
+        // Toward the left or the top, the tiles slide back; the other way, forward
+        let towardStart = flow == .left || flow == .up
+        let shift = CGFloat(gradient.flowFraction) * length * (towardStart ? -1 : 1)
+        // One tile before the area and one after, so the area is always covered
+        for tile in -1...1 {
+            let start = CGFloat(tile) * length + shift
+            let rect = horizontal
+                ? CGRect(x: area.minX + start, y: area.minY, width: length, height: area.height)
+                : CGRect(x: area.minX, y: area.minY + start, width: area.width, height: length)
+            cg.saveGState()
+            cg.clip(to: rect)
+            cg.setBlendMode(.sourceIn)
+            cg.drawLinearGradient(
+                cgGradient,
+                start: CGPoint(x: rect.minX, y: rect.minY),
+                end: horizontal ? CGPoint(x: rect.maxX, y: rect.minY) : CGPoint(x: rect.minX, y: rect.maxY),
+                options: []
+            )
+            cg.restoreGState()
+        }
     }
 
     private func drawText(in cg: CGContext, canvasSize: CGSize, color: CGColor) {

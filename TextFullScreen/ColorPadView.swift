@@ -10,8 +10,15 @@ import AppKit
 /// Colour, or drag it away from the grid and let go once it's more than 1.5 times its own size from
 /// its spot. Drag the big current-color square onto a square to save the color there, and drag one
 /// saved square onto another to move it.
+/// What a color or gradient pad edits.
+enum ColorPadTarget {
+    case text, wallpaper
+}
+
 struct ColorPadView: View {
     private var settings = DisplaySettings()
+    /// Which color the pad edits. The saved squares are shared either way.
+    var target: ColorPadTarget = .text
     @AppStorage("colorPadTab") private var tab: ColorPadTab = .wheel
 
     /// Kept apart from the stored color so the hue survives at zero brightness or saturation.
@@ -55,13 +62,13 @@ struct ColorPadView: View {
                 case .wheel:
                     ColorWheelTab(hue: hue, saturation: saturation, brightness: brightness, onChange: setHSB)
                 case .sliders:
-                    ColorSlidersTab(color: settings.color, hsb: (hue, saturation, brightness), onColor: setColor, onHSB: setHSB)
+                    ColorSlidersTab(color: current, hsb: (hue, saturation, brightness), onColor: setColor, onHSB: setHSB)
                 case .palette:
-                    ColorPaletteTab(selected: settings.color, onColor: setColor)
+                    ColorPaletteTab(selected: current, onColor: setColor)
                 case .spectrum:
                     ColorSpectrumTab(hue: hue, saturation: saturation, brightness: brightness, onChange: setHSB)
                 case .pencils:
-                    ColorPencilsTab(selected: settings.color, onColor: setColor)
+                    ColorPencilsTab(selected: current, onColor: setColor)
                 }
             }
             .frame(height: 300)
@@ -83,7 +90,7 @@ struct ColorPadView: View {
             // The current color following the pointer while it's dragged onto a square
             if let location = wellDragLocation {
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(settings.color.color)
+                    .fill(current.color)
                     .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(.secondary.opacity(0.5)))
                     .frame(width: slotSize + 6, height: slotSize + 6)
                     .position(location)
@@ -91,7 +98,7 @@ struct ColorPadView: View {
             }
         }
         .onAppear(perform: syncFromStoredColor)
-        .onChange(of: settings.color) { _, newColor in
+        .onChange(of: current) { _, newColor in
             // Only re-read when the color changed somewhere else, so dragging stays smooth
             if TextColor(hue: hue, saturation: saturation, brightness: brightness).rawValue != newColor.rawValue {
                 syncFromStoredColor()
@@ -103,7 +110,7 @@ struct ColorPadView: View {
 
     private var currentColorWell: some View {
         RoundedRectangle(cornerRadius: 6)
-            .fill(settings.color.color)
+            .fill(current.color)
             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.secondary.opacity(0.5)))
             .frame(width: 48, height: 48)
             .contentShape(Rectangle())
@@ -113,14 +120,14 @@ struct ColorPadView: View {
                     .onEnded { value in
                         if let slot = slot(at: value.location) {
                             var slots = settings.colorSlots
-                            slots[slot] = settings.color
+                            slots[slot] = current
                             settings.colorSlots = slots
                         }
                         wellDragLocation = nil
                     }
             )
             .help("Drag onto a square to save this color")
-            .accessibilityLabel("Current color, \(settings.color.hex)")
+            .accessibilityLabel("Current color, \(current.hex)")
             .accessibilityAction(named: "Save to first empty square", saveToFirstEmptySlot)
     }
 
@@ -168,7 +175,7 @@ struct ColorPadView: View {
         if let color {
             let isDragged = draggedSlot == index
             let willRemove = isDragged && willRemoveDraggedSlot
-            let isCurrent = color.rawValue == settings.color.rawValue
+            let isCurrent = color.rawValue == current.rawValue
 
             shape
                 .fill(color.color)
@@ -256,26 +263,34 @@ struct ColorPadView: View {
     private func saveToFirstEmptySlot() {
         var slots = settings.colorSlots
         guard let empty = slots.firstIndex(where: { $0 == nil }) else { return }
-        slots[empty] = settings.color
+        slots[empty] = current
         settings.colorSlots = slots
     }
 
     // MARK: Setting the color
 
+    /// The color being edited: the text's or the wallpaper's.
+    private var current: TextColor {
+        get { target == .wallpaper ? settings.wallpaperColor : settings.color }
+        nonmutating set {
+            if target == .wallpaper { settings.wallpaperColor = newValue } else { settings.color = newValue }
+        }
+    }
+
     private func setHSB(_ hue: Double, _ saturation: Double, _ brightness: Double) {
         self.hue = hue
         self.saturation = saturation
         self.brightness = brightness
-        settings.color = TextColor(hue: hue, saturation: saturation, brightness: brightness)
+        current = TextColor(hue: hue, saturation: saturation, brightness: brightness)
     }
 
     private func setColor(_ color: TextColor) {
-        settings.color = color
+        current = color
         syncFromStoredColor()
     }
 
     private func syncFromStoredColor() {
-        let hsb = settings.color.hsb
+        let hsb = current.hsb
         // Keep the old hue for grays, where the color itself has none
         if hsb.saturation > 0 && hsb.brightness > 0 { hue = hsb.hue }
         if hsb.brightness > 0 { saturation = hsb.saturation }

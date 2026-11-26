@@ -11,6 +11,8 @@ struct ContentView: View {
     /// Where the top of the input panel is on screen (in the window's coordinates), once laid out
     @State private var inputPanelTop: CGFloat?
     @FocusState private var isFocused: Bool
+    /// True while text from another app is dragged over the window.
+    @State private var isDropTargeted = false
     #if os(macOS)
     @State private var isFullScreen: Bool = false
     /// The settings shown inside this window, as they are while it's full screen.
@@ -28,14 +30,11 @@ struct ContentView: View {
         ZStack {
             // 1. Background Handling
             Group {
-                if isFullScreen {
-                    settings.appScheme == .dark ? Color(white: 0.075) : Color.white
+                if let background = settings.activeBackground {
+                    // The chosen photo, color or gradient, in full screen and in a window alike
+                    WallpaperBackgroundView(background: background) { plainBackground }
                 } else {
-                    ZStack {
-                        // "Liquid Glass" Transparent Effect
-                        VisualEffectBlur(material: .hudWindow, blendingMode: .behindWindow)
-                        Color.white.opacity(0.1)
-                    }
+                    plainBackground
                 }
             }
             .edgesIgnoringSafeArea(.all)
@@ -63,6 +62,20 @@ struct ContentView: View {
                         .contentShape(Rectangle())
                         .onTapGesture { isFocused = false }
                         #endif
+                    } else if settings.gradientMoves, let gradient = settings.gradient {
+                        // The text stays still and its gradient flows through it instead
+                        FlowingGradientTextView(
+                            text: text,
+                            font: settings.font,
+                            weight: settings.weight,
+                            direction: settings.scrollDirection,
+                            speed: settings.scrollSpeed,
+                            fill: CGFloat(settings.scrollSizeInUse),
+                            gradient: gradient
+                        )
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .contentShape(Rectangle())
+                        .onTapGesture(perform: toggleInputPanel)
                     } else if settings.scrollEnabled {
                         // Text keeps a large size and scrolls across (and off) the screen
                         ScrollingTextView(
@@ -125,6 +138,10 @@ struct ContentView: View {
                             
                             TextEditor(text: $text)
                                 .focused($isFocused)
+                                // Pasted Markdown becomes plain text, like dropped Markdown
+                                .onChange(of: text) { oldText, newText in
+                                    convertPastedMarkdown(from: oldText, to: newText)
+                                }
                                 .font(.system(size: 18, weight: .medium, design: .default))
                                 .foregroundColor(.primary)
                                 .scrollContentBackground(.hidden)
@@ -180,6 +197,15 @@ struct ContentView: View {
                 .zIndex(2)
             }
         }
+        // Text (or a text file) dragged in from another app becomes the big text
+        .dropDestination(for: DroppedText.self) { items, _ in
+            receiveDrop(items)
+        } isTargeted: { targeted in
+            withAnimation(.easeOut(duration: 0.15)) { isDropTargeted = targeted }
+        }
+        .overlay {
+            if isDropTargeted { dropHighlight }
+        }
         .preferredColorScheme(settings.appScheme.colorScheme)
         #if os(macOS)
         .frame(minWidth: 800, minHeight: 600)
@@ -232,6 +258,72 @@ struct ContentView: View {
         #endif
     }
     
+    /// The outline and hint shown while text is dragged over the window.
+    private var dropHighlight: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 24)
+                .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 4, dash: [14, 8]))
+                .padding(14)
+            Label("Drop to show this text", systemImage: "text.badge.plus")
+                .font(.title3.weight(.semibold))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
+                .background(.regularMaterial, in: Capsule())
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .transition(.opacity)
+    }
+
+    /// Puts dropped text in the text box, in place of what was there. Markdown is turned into
+    /// plain text first when that's switched on in Settings.
+    private func receiveDrop(_ items: [DroppedText]) -> Bool {
+        let pieces = items.map { item in
+            settings.dropConvertsMarkdown && (item.isMarkdownFile || MarkdownText.looksLikeMarkdown(item.text))
+                ? MarkdownText.plainText(from: item.text)
+                : item.text
+        }
+        let dropped = pieces.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !dropped.isEmpty else { return false }
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+            text = dropped
+            isInputVisible = true
+        }
+        return true
+    }
+
+    /// When a chunk of Markdown arrives in the text box at once (pasted, or dragged straight into
+    /// the box), it's turned into plain text in place, if that's switched on in Settings. Typing
+    /// adds one character at a time, so it's never touched.
+    private func convertPastedMarkdown(from oldText: String, to newText: String) {
+        guard settings.dropConvertsMarkdown, newText.count > oldText.count + 1 else { return }
+        let old = Array(oldText), new = Array(newText)
+        // The inserted part is what's left between the unchanged start and the unchanged end
+        var prefix = 0
+        while prefix < old.count, old[prefix] == new[prefix] { prefix += 1 }
+        var suffix = 0
+        while suffix < old.count - prefix, old[old.count - 1 - suffix] == new[new.count - 1 - suffix] { suffix += 1 }
+        let inserted = String(new[prefix..<(new.count - suffix)])
+        guard inserted.count > 1, MarkdownText.looksLikeMarkdown(inserted) else { return }
+        let plain = MarkdownText.plainText(from: inserted)
+        guard plain != inserted else { return }
+        text = String(new[..<prefix]) + plain + String(new[(new.count - suffix)...])
+    }
+
+    /// White (or near black) in full screen; see-through glass in a window.
+    @ViewBuilder
+    private var plainBackground: some View {
+        if isFullScreen {
+            settings.appScheme == .dark ? Color(white: 0.075) : Color.white
+        } else {
+            ZStack {
+                // "Liquid Glass" Transparent Effect
+                VisualEffectBlur(material: .hudWindow, blendingMode: .behindWindow)
+                Color.white.opacity(0.1)
+            }
+        }
+    }
+
     #if os(macOS)
     private func recheckFullScreen(_ note: Notification) {
         guard let window = note.object as? NSWindow, window === hostWindow else { return }
@@ -240,12 +332,13 @@ struct ContentView: View {
     }
     #endif
 
-    /// How far to raise the placeholder from the middle of `area`. On iPhone it's centered in the
-    /// space between the top of the screen and the top of the input panel, so it doesn't look low
-    /// above the panel. With the panel hidden, and on iPad and Mac, it stays in the middle.
+    /// How far to raise the placeholder from the middle of `area`. On an upright iPhone it's
+    /// centered in the space between the top of the screen and the top of the input panel, so it
+    /// doesn't look low above the panel. In landscape, with the panel hidden, and on iPad and Mac,
+    /// it stays in the middle of the screen.
     private func placeholderLift(in area: CGRect) -> CGFloat {
         #if os(iOS)
-        guard UIDevice.current.userInterfaceIdiom == .phone, isInputVisible,
+        guard UIDevice.current.userInterfaceIdiom == .phone, area.height > area.width, isInputVisible,
               let panelTop = inputPanelTop, panelTop > area.minY, panelTop < area.maxY else { return 0 }
         return area.midY - (area.minY + panelTop) / 2
         #else

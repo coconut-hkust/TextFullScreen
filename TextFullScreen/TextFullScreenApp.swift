@@ -17,6 +17,16 @@ struct TextFullScreenApp: App {
         .commands {
             // ⌘, opens the settings inside the window when it's full screen
             CommandGroup(replacing: .appSettings) { SettingsMenuItem() }
+
+            // App menu ▸ About TextFullScreen, with a Get Support link under the version
+            CommandGroup(replacing: .appInfo) {
+                Button("About TextFullScreen") { showAboutPanel() }
+            }
+
+            // Help ▸ Get Support opens the app's GitHub page
+            CommandGroup(replacing: .help) {
+                Link("Get Support", destination: supportURL)
+            }
         }
         #endif
 
@@ -30,3 +40,24 @@ struct TextFullScreenApp: App {
         #endif
     }
 }
+
+/// Where people get help with the app: its GitHub page.
+let supportURL = URL(string: "https://github.com/coconut-hkust/TextFullScreen")!
+
+#if os(macOS)
+import AppKit
+
+/// The standard About window, with a centred Get Support link to GitHub under the version.
+@MainActor
+private func showAboutPanel() {
+    let centred = NSMutableParagraphStyle()
+    centred.alignment = .center
+    let credits = NSAttributedString(string: "Get Support", attributes: [
+        .link: supportURL,
+        .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+        .paragraphStyle: centred,
+    ])
+    NSApplication.shared.orderFrontStandardAboutPanel(options: [.credits: credits])
+    NSApplication.shared.activate()
+}
+#endif

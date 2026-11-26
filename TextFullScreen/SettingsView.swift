@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var isColorPadShown = false
     @State private var isGradientPadShown = false
     @State private var isConfirmingDefaults = false
+    @State private var showsAllWallpapers = false
 
     var body: some View {
         Form {
@@ -70,6 +71,10 @@ struct SettingsView: View {
             }
 
             scrollingSection
+
+            wallpaperSection
+
+            droppedTextSection
 
             savedSection
         }
@@ -208,8 +213,71 @@ struct SettingsView: View {
         }
     }
 
+    /// The Wallpaper switch, and below it while it's on: Add Photo… and the photos added so far.
+    private var wallpaperSection: some View {
+        Section {
+            Toggle("Wallpaper", isOn: settings.$wallpaperEnabled)
+
+            if settings.wallpaperEnabled {
+                WallpaperPicker(showsAll: $showsAllWallpapers)
+
+                if settings.wallpaperID == WallpaperBackground.gradientID {
+                    Picker("Direction", selection: settings.$wallpaperGradientDirection) {
+                        ForEach(GradientDirection.allCases) { direction in
+                            Text(direction.displayName)
+                                .accessibilityLabel(direction.accessibilityName)
+                                .tag(direction)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+            }
+        } header: {
+            HStack {
+                Text("Wallpaper")
+                Spacer()
+                let count = settings.wallpapers.count + settings.wallpaperFills.count
+                if settings.wallpaperEnabled && count > 3 {
+                    Button(showsAllWallpapers ? "Show Less" : "Show All (\(count))") {
+                        withAnimation(.easeInOut(duration: 0.2)) { showsAllWallpapers.toggle() }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .textCase(nil)
+                }
+            }
+        } footer: {
+            Text(wallpaperFooter)
+        }
+    }
+
+    /// What happens to text dragged onto the main window from another app.
+    private var droppedTextSection: some View {
+        Section {
+            Toggle("Convert Markdown to plain text", isOn: settings.$dropConvertsMarkdown)
+        } header: {
+            Text("Dropped Text")
+        } footer: {
+            Text(settings.dropConvertsMarkdown
+                 ? "Drag selected text or a text file from another app onto the big text to show it. Markdown that's dropped or pasted (a .md file, or text with # headings, **bold**, [links] and the like) loses its formatting symbols and shows as plain words. Code and escaped symbols are kept."
+                 : "Drag selected text or a text file from another app onto the big text to show it. Dropped or pasted Markdown is shown exactly as written, symbols and all.")
+        }
+    }
+
+    private var wallpaperFooter: String {
+        guard settings.wallpaperEnabled else { return "Shows a photo, a color or a gradient behind the text, in place of the plain background." }
+        #if os(macOS)
+        return "Click a tile to use it; Color and Gradient open their pads, and right-clicking either one saves it as a tile of its own or downloads it as a picture the size of your screen. Right-click a photo to crop and zoom it again, or any saved tile to remove it. To add a photo, click Add Photo… or drop a picture on it."
+        #else
+        return "Tap a tile to use it; Color and Gradient open their pads, and touching and holding either one saves it as a tile of its own or downloads it as a picture the size of your screen. Touch and hold a photo to crop and zoom it again, or any saved tile to remove it."
+        #endif
+    }
+
     private var movingFooter: String {
         guard settings.scrollEnabled else { return "Text stays large and moves across the screen." }
+        if settings.gradientMoves {
+            return "The text stays still and fills the screen, and the gradient flows through the letters in the direction and at the speed set here."
+        }
         return settings.motion == .pan
             ? (settings.panKeepsRows
                ? "Each row pans on its own line, all at the same time. Start a new row with \(newRowKey). At 100% the rows together are as tall as the screen allows."
@@ -219,6 +287,16 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var movingControls: some View {
+        // With a gradient on, the text can stay still while the gradient flows through it
+        if settings.gradientEnabled {
+            Picker("Moves", selection: settings.$scrollMover) {
+                ForEach(ScrollMover.allCases) { mover in
+                    Text(mover.displayName).tag(mover)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
+
         Picker("Motion", selection: settings.$motion) {
             ForEach(ScrollMotion.allCases) { motion in
                 Text(motion.displayName).tag(motion)
@@ -235,7 +313,9 @@ struct SettingsView: View {
             }
             .pickerStyle(.segmented)
 
-            Toggle("Keep rows", isOn: settings.$panKeepsRows)
+            if !settings.gradientMoves {
+                Toggle("Keep rows", isOn: settings.$panKeepsRows)
+            }
         case .rise:
             Picker("Direction", selection: settings.$riseDirection) {
                 ForEach(RiseDirection.allCases) { direction in
@@ -372,7 +452,7 @@ struct SettingsView: View {
                     .confirmationDialog("Load the default settings?", isPresented: $isConfirmingDefaults) {
                         Button("Load Defaults", role: .destructive) { settings.loadDefaults() }
                     } message: {
-                        Text("The font, color, gradient, size and moving settings go back to how the app first starts, and all saved colors are removed. Your saved slots are kept.")
+                        Text("The font, color, gradient, size and moving settings go back to how the app first starts, and all saved colors are removed. Your saved slots and the wallpaper are kept.")
                     }
             }
             .buttonStyle(.bordered)
@@ -415,7 +495,7 @@ struct SettingsView: View {
         } header: {
             Text("Saved Settings")
         } footer: {
-            Text("Save keeps a copy of the current font, color, saved colors, gradient, size and moving settings. Load brings them back.")
+            Text("Save keeps a copy of the current font, color, saved colors, gradient, size and moving settings. Load brings them back. The wallpaper is kept apart and doesn't change.")
         }
     }
 

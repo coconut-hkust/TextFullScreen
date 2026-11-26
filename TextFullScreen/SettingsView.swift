@@ -57,9 +57,9 @@ struct SettingsView: View {
             gradientSection
 
             Section {
-                Toggle("Separate maximum size for scrolling", isOn: settings.$separateScrollSize)
+                Toggle("Separate maximum size for moving", isOn: settings.$separateScrollSize)
 
-                Toggle("Scrolling", isOn: settings.$scrollEnabled)
+                Toggle("Moving", isOn: settings.$scrollEnabled)
 
                 // Shared by both layouts unless scrolling has its own, shown in the Scrolling section
                 if !settings.scrollEnabled || !settings.separateScrollSize {
@@ -188,7 +188,7 @@ struct SettingsView: View {
         switch settings.gradientStyle {
         case .whole:
             return settings.gradientAnchor == .screen
-                ? "One big gradient fills the screen behind the text, and only shows through the letters. Scrolling letters pass over its colors."
+                ? "One big gradient fills the screen behind the text, and only shows through the letters. Moving letters pass over its colors."
                 : "One gradient is stretched over the text and moves along with it."
         case .perCharacter, .perWord:
             return settings.gradientRepeats
@@ -240,7 +240,7 @@ struct SettingsView: View {
                 percentControl("Maximum size", value: scrollSizePercent, in: scrollSizePercentRange)
             }
         } header: {
-            Text("Scrolling")
+            Text("Moving")
         } footer: {
             Text(settings.motion == .pan
                  ? (settings.panKeepsRows
@@ -297,8 +297,8 @@ struct SettingsView: View {
             ? "Text stays large and moves across the screen."
             : "Text shrinks until all of it fits on the screen. Maximum size is how much of the screen's width and height it may fill."
         let sharing = settings.separateScrollSize
-            ? "Scrolling text has its own maximum size."
-            : "The same maximum size is used whether the text scrolls or not."
+            ? "Moving text has its own maximum size."
+            : "The same maximum size is used whether the text moves or not."
         return mode + " " + sharing
     }
 
@@ -340,7 +340,7 @@ struct SettingsView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Default Settings")
-                    Text("SF Pro · Black · 80% · no saved colors")
+                    Text("SF Pro · Black · 100% · no saved colors")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -352,7 +352,7 @@ struct SettingsView: View {
                     .confirmationDialog("Load the default settings?", isPresented: $isConfirmingDefaults) {
                         Button("Load Defaults", role: .destructive) { settings.loadDefaults() }
                     } message: {
-                        Text("The font, color, gradient, size and scrolling settings go back to how the app first starts, and all saved colors are removed. Your saved slots are kept.")
+                        Text("The font, color, gradient, size and moving settings go back to how the app first starts, and all saved colors are removed. Your saved slots are kept.")
                     }
             }
             .buttonStyle(.bordered)
@@ -395,7 +395,7 @@ struct SettingsView: View {
         } header: {
             Text("Saved Settings")
         } footer: {
-            Text("Save keeps a copy of the current font, color, saved colors, gradient, size and scrolling settings. Load brings them back.")
+            Text("Save keeps a copy of the current font, color, saved colors, gradient, size and moving settings. Load brings them back.")
         }
     }
 

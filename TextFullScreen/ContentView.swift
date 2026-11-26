@@ -49,7 +49,7 @@ struct ContentView: View {
                         // Text by its line boxes left it low, as they hold room above capitals and
                         // below the last baseline. It breaks onto two rows on a narrow screen.
                         FillingTextView(
-                            text: geometry.size.width < geometry.size.height ? "Type\nsomething..." : "Type something...",
+                            text: geometry.size.width < geometry.size.height ? "type\nsomething..." : "type something...",
                             font: .standard, // Always SF Pro, whatever typeface is chosen for the text
                             weight: .bold,
                             fill: 0.9,

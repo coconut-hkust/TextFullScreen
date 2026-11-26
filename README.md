@@ -1,13 +1,13 @@
 # TextFullScreen
 
-Type a word or a few rows of text and the app shows it as big as your screen allows. It's useful as a sign, a message held up across a room, or a scrolling banner.
+Type a word or a few rows of text and the app shows it as big as your screen allows. It's useful as a sign, a message held up across a room, or a moving banner.
 
 Runs on **iPhone, iPad and Mac** from one SwiftUI project.
 
 ## Features
 
 - **Fills the screen.** Text is sized by its drawn glyphs, so it uses as much of the screen as possible. A *Maximum size* setting (80–100%) leaves a margin.
-- **Scrolling.** Text can scroll off the screen like a banner instead of being fitted, with its own maximum size if you want one.
+- **Moving.** Text can move across the screen like a banner instead of being fitted, with its own maximum size if you want one.
 - **Fonts.** Pick from Apple fonts, classic fonts or all installed fonts, and choose a weight.
 - **Colours and gradients.** The app has its own colour pad, a grid of saved colours, and gradient text with direction, style and repeat options.
 - **Saved settings.** Three slots store a full look (font, colours, sizes), plus a Default Settings row.

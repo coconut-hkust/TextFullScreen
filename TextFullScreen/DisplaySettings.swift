@@ -44,7 +44,7 @@ struct DisplaySettings: nonisolated DynamicProperty {
     /// On: the text keeps a large size and moves across the screen.
     @AppStorage("scrollEnabled") var scrollEnabled = false
     /// While scrolling is off: how much of the screen the text may fill at most, in percent.
-    @AppStorage("fillPercent") var fillPercent = 80
+    @AppStorage("fillPercent") var fillPercent = 100
     @AppStorage("scrollMotion") var motion: ScrollMotion = .pan
     @AppStorage("panDirection") var panDirection: PanDirection = .rightToLeft
     @AppStorage("riseDirection") var riseDirection: RiseDirection = .bottomToTop
@@ -210,7 +210,7 @@ struct DisplaySettings: nonisolated DynamicProperty {
         color = .black
         colorSlots = Array(repeating: nil, count: Self.colorSlotCount)
         scrollEnabled = false
-        fillPercent = 80
+        fillPercent = 100
         motion = .pan
         panDirection = .rightToLeft
         riseDirection = .bottomToTop
@@ -296,12 +296,12 @@ nonisolated struct SavedSettings: Codable, Sendable {
         colorSlots.map { DisplaySettings.colorSlots(from: $0).compactMap { $0 }.count }
     }
 
-    /// A short description for the slot's row, e.g. "SF Pro · Black · 80% · 3 colors".
+    /// A short description for the slot's row, e.g. "SF Pro · Black · 100% · 3 colors".
     var summary: String {
         let fontName = TextFont(rawValue: font)?.displayName ?? "Font"
         let weightName = TextWeight(rawValue: weight)?.displayName ?? ""
         let layout = scrollEnabled
-            ? (ScrollMotion(rawValue: motion)?.displayName ?? "Scroll")
+            ? (ScrollMotion(rawValue: motion)?.displayName ?? "Moving")
             : "\(fillPercent)%"
         let colors = savedColorCount.map { $0 == 1 ? "1 color" : "\($0) colors" } ?? ""
         let gradient = gradientEnabled == true

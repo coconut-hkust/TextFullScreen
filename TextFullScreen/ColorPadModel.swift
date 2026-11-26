@@ -8,7 +8,7 @@ import CoreGraphics
 
 /// The three appearance buttons at the top of the pad.
 nonisolated enum AppScheme: String, CaseIterable, Identifiable, Sendable {
-    /// Follows the system, with the full-screen page kept white (the app's original look).
+    /// Follows the system's Light or Dark Mode, full screen included.
     case auto
     case light
     case dark
@@ -40,6 +40,33 @@ nonisolated enum AppScheme: String, CaseIterable, Identifiable, Sendable {
         }
     }
 }
+
+extension View {
+    /// Shows the app in the chosen appearance. On the Mac it's set for the whole app, which also
+    /// reliably goes back to following the system when Automatic is chosen again.
+    func appAppearance(_ scheme: AppScheme) -> some View {
+        #if os(macOS)
+        onAppear { NSApplication.shared.appearance = scheme.nsAppearance }
+            .onChange(of: scheme) { _, new in NSApplication.shared.appearance = new.nsAppearance }
+        #else
+        preferredColorScheme(scheme.colorScheme)
+        #endif
+    }
+}
+
+#if os(macOS)
+import AppKit
+
+extension AppScheme {
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .auto: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+    }
+}
+#endif
 
 // MARK: - Harmonies
 

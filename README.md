@@ -12,6 +12,7 @@ Runs on **iPhone, iPad and Mac** from one SwiftUI project.
 - **Colours and gradients.** The app has its own colour pad, a grid of saved colours, and gradient text with direction, style and repeat options.
 - **Wallpaper.** Put a photo, a plain colour or a gradient behind the text. Photos are cropped and zoomed to your screen's shape; colours and gradients can be saved as tiles and downloaded as screen-sized pictures.
 - **Drop or paste text.** Drag text or a text file from another app onto the window to show it. Markdown can be turned into plain text automatically.
+- **Dark Mode.** A black page with white text, following the system or set to Light or Dark in Settings.
 - **Saved settings.** Three slots store a full look (font, colours, sizes), plus a Default Settings row.
 - **Liquid Glass app icon.**
 

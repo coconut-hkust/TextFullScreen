@@ -20,6 +20,8 @@ struct ColorPadView: View {
     /// Which color the pad edits. The saved squares are shared either way.
     var target: ColorPadTarget = .text
     @AppStorage("colorPadTab") private var tab: ColorPadTab = .wheel
+    /// The text's default black shows as white in Dark Mode, so the pad shows it that way too.
+    @Environment(\.colorScheme) private var colorScheme
 
     /// Kept apart from the stored color so the hue survives at zero brightness or saturation.
     @State private var hue = 0.0
@@ -271,7 +273,7 @@ struct ColorPadView: View {
 
     /// The color being edited: the text's or the wallpaper's.
     private var current: TextColor {
-        get { target == .wallpaper ? settings.wallpaperColor : settings.color }
+        get { target == .wallpaper ? settings.wallpaperColor : settings.textColor(in: colorScheme, onPlainBackground: true) }
         nonmutating set {
             if target == .wallpaper { settings.wallpaperColor = newValue } else { settings.color = newValue }
         }

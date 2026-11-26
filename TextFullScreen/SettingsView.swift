@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var isGradientPadShown = false
     @State private var isConfirmingDefaults = false
     @State private var showsAllWallpapers = false
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Form {
@@ -23,14 +24,14 @@ struct SettingsView: View {
                 LabeledContent("Color") {
                     Button { isColorPadShown.toggle() } label: {
                         RoundedRectangle(cornerRadius: 5)
-                            .fill(settings.color.color)
+                            .fill(shownTextColor.color)
                             .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(.secondary.opacity(0.5)))
                             .frame(width: 44, height: 22)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help("Choose the text color")
-                    .accessibilityLabel("Text color, \(settings.color.hex)")
+                    .accessibilityLabel("Text color, \(shownTextColor.hex)")
                     .popover(isPresented: $isColorPadShown, arrowEdge: .trailing) {
                         ColorPadView()
                             .fittedSheetOnPhone()
@@ -40,14 +41,16 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Saved Colors")
                     SavedColorsView()
-                    Text(savedColorsHint)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if settings.showsDescriptions {
+                        Text(savedColorsHint)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 previewText("The quick brown fox")
                     .font(settings.font.font(size: 34, weight: settings.weight))
-                    .textFill(settings.gradient, plain: settings.color.color)
+                    .textFill(settings.gradient, plain: shownTextColor.color)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .frame(maxWidth: .infinity)
@@ -67,7 +70,7 @@ struct SettingsView: View {
             } header: {
                 Text("Layout")
             } footer: {
-                Text(layoutFooter)
+                descriptionText(layoutFooter)
             }
 
             scrollingSection
@@ -81,12 +84,35 @@ struct SettingsView: View {
             aboutSection
         }
         .formStyle(.grouped)
-        .preferredColorScheme(settings.appScheme.colorScheme)
+        .appAppearance(settings.appScheme)
         #if os(macOS)
         // A set height, with the settings scrolling inside it. The window can be dragged taller or shorter.
         .frame(width: 460)
         .frame(minHeight: 360, idealHeight: 620, maxHeight: .infinity)
         #endif
+    }
+
+    /// Automatic, Light or Dark, for the whole app. Also set with the buttons on the gradient pad.
+    private var appearancePicker: some View {
+        Picker("Appearance", selection: settings.$appScheme) {
+            ForEach(AppScheme.allCases) { scheme in
+                Label(scheme.displayName, systemImage: scheme.symbol).tag(scheme)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    /// A section's explanation, shown only while Show descriptions is on.
+    @ViewBuilder
+    private func descriptionText(_ text: String) -> some View {
+        if settings.showsDescriptions {
+            Text(text)
+        }
+    }
+
+    /// The text color as it shows on the plain page in the current appearance.
+    private var shownTextColor: TextColor {
+        settings.textColor(in: colorScheme, onPlainBackground: true)
     }
 
     /// The preview line, colored per character or word when the gradient does that.
@@ -157,7 +183,7 @@ struct SettingsView: View {
         } header: {
             Text("Gradient")
         } footer: {
-            Text(gradientFooter)
+            descriptionText(gradientFooter)
         }
     }
 
@@ -211,7 +237,7 @@ struct SettingsView: View {
         } header: {
             Text("Moving")
         } footer: {
-            Text(movingFooter)
+            descriptionText(movingFooter)
         }
     }
 
@@ -249,7 +275,7 @@ struct SettingsView: View {
                 }
             }
         } footer: {
-            Text(wallpaperFooter)
+            descriptionText(wallpaperFooter)
         }
     }
 
@@ -260,7 +286,7 @@ struct SettingsView: View {
         } header: {
             Text("Dropped Text")
         } footer: {
-            Text(settings.dropConvertsMarkdown
+            descriptionText(settings.dropConvertsMarkdown
                  ? "Drag selected text or a text file from another app onto the big text to show it. Markdown that's dropped or pasted (a .md file, or text with # headings, **bold**, [links] and the like) loses its formatting symbols and shows as plain words. Code and escaped symbols are kept."
                  : "Drag selected text or a text file from another app onto the big text to show it. Dropped or pasted Markdown is shown exactly as written, symbols and all.")
         }
@@ -497,13 +523,17 @@ struct SettingsView: View {
         } header: {
             Text("Saved Settings")
         } footer: {
-            Text("Save keeps a copy of the current font, color, saved colors, gradient, size and moving settings. Load brings them back. The wallpaper is kept apart and doesn't change.")
+            descriptionText("Save keeps a copy of the current font, color, saved colors, gradient, size and moving settings. Load brings them back. The wallpaper is kept apart and doesn't change.")
         }
     }
 
-    /// The app's version, where its code lives, its licence, who made it and where to send ideas.
+    /// The appearance, the app's version, where its code lives, its licence, who made it and where to send ideas.
     private var aboutSection: some View {
         Section {
+            appearancePicker
+
+            Toggle("Show descriptions", isOn: settings.$showsDescriptions)
+
             LabeledContent("Version", value: appVersion)
 
             aboutLink("Source Code on GitHub", systemImage: "chevron.left.forwardslash.chevron.right", url: supportURL)

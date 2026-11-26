@@ -129,7 +129,7 @@ struct ExportedWallpaper: Identifiable {
         }
         let (size, scale) = Self.screen
         let content = WallpaperBackgroundView(background: background) {
-            dark ? Color(white: 0.075) : Color.white
+            dark ? Color.black : Color.white
         }
         .frame(width: size.width, height: size.height)
         let renderer = ImageRenderer(content: content)
@@ -442,6 +442,10 @@ struct WallpaperEdit: Identifiable {
 struct WallpaperPicker: View {
     @Binding var showsAll: Bool
     private var settings = DisplaySettings()
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// The plain page a see-through gradient tile shows over: white, or black in Dark Mode.
+    private var pageColor: Color { colorScheme == .dark ? .black : .white }
 
     @State private var edit: WallpaperEdit?
     @State private var isDropTargeted = false
@@ -610,7 +614,7 @@ struct WallpaperPicker: View {
         } label: {
             swatchTile(title: "Gradient", size: size, isSelected: isSelected) {
                 if let gradient = settings.wallpaperGradient {
-                    WallpaperBackgroundView(background: .gradient(gradient)) { Color.white }
+                    WallpaperBackgroundView(background: .gradient(gradient)) { pageColor }
                 } else {
                     Rectangle().fill(.quaternary)
                 }
@@ -660,7 +664,7 @@ struct WallpaperPicker: View {
         let isColor = fill.color != nil
         let face = swatchTile(title: "", size: size, isSelected: isSelected, showsTitle: false) {
             if let background = fill.background {
-                WallpaperBackgroundView(background: background) { Color.white }
+                WallpaperBackgroundView(background: background) { pageColor }
             } else {
                 Rectangle().fill(.quaternary)
             }
@@ -706,7 +710,7 @@ struct WallpaperPicker: View {
     }
 
     private func download(_ background: WallpaperBackground) {
-        export = ExportedWallpaper(background, dark: settings.appScheme == .dark)
+        export = ExportedWallpaper(background, dark: colorScheme == .dark)
     }
 
     private func removeFill(_ fill: WallpaperFill) {

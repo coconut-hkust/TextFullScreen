@@ -89,7 +89,7 @@ struct ContentView: View {
                             gradient: settings.gradient
                         )
                         .id(settings.scrollDirection) // Start again from the edge when the direction changes
-                        .foregroundColor(settings.color.color)
+                        .foregroundColor(textColor)
                         .contentShape(Rectangle())
                         .onTapGesture(perform: toggleInputPanel)
                         .ignoresSafeArea() // Run edge to edge: under the iPhone's notch and home indicator, and behind the keyboard
@@ -100,7 +100,7 @@ struct ContentView: View {
                             font: settings.font,
                             weight: settings.weight,
                             fill: CGFloat(settings.fillPercent) / 100,
-                            color: settings.color.color,
+                            color: textColor,
                             gradient: settings.gradient
                         )
                             .frame(width: geometry.size.width, height: geometry.size.height)
@@ -115,8 +115,7 @@ struct ContentView: View {
             // placeholder sits in its true middle. The keyboard is still kept clear of.
             .ignoresSafeArea(.container)
             #endif
-            // On the white full-screen background, use Light Mode colors even in Dark Mode, unless
-            // the appearance is set to Light or Dark on the color pad
+            // Light or Dark, as chosen in Settings (Automatic follows the system)
             .environment(\.colorScheme, textColorScheme)
 
             // 3. The Floating Glass Input Panel
@@ -179,13 +178,13 @@ struct ContentView: View {
                     .background(
                         ZStack {
                             VisualEffectBlur(material: .popover, blendingMode: .withinWindow)
-                            Color.white.opacity(0.2)
+                            (isDark ? Color.black : Color.white).opacity(0.2)
                         }
                     )
                     .cornerRadius(20)
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                            .stroke(Color.white.opacity(isDark ? 0.12 : 0.3), lineWidth: 1)
                     )
                     .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { inputPanelTop = $0 }
                     .shadow(color: Color.black.opacity(0.15), radius: 15, x: 0, y: 10)
@@ -206,7 +205,7 @@ struct ContentView: View {
         .overlay {
             if isDropTargeted { dropHighlight }
         }
-        .preferredColorScheme(settings.appScheme.colorScheme)
+        .appAppearance(settings.appScheme)
         #if os(macOS)
         .frame(minWidth: 800, minHeight: 600)
         // Style this view's own window. (NSApp.windows.first could be the Settings window.)
@@ -310,16 +309,16 @@ struct ContentView: View {
         text = String(new[..<prefix]) + plain + String(new[(new.count - suffix)...])
     }
 
-    /// White (or near black) in full screen; see-through glass in a window.
+    /// White (black in Dark Mode) in full screen; see-through glass in a window.
     @ViewBuilder
     private var plainBackground: some View {
         if isFullScreen {
-            settings.appScheme == .dark ? Color(white: 0.075) : Color.white
+            isDark ? Color.black : Color.white
         } else {
             ZStack {
                 // "Liquid Glass" Transparent Effect
                 VisualEffectBlur(material: .hudWindow, blendingMode: .behindWindow)
-                Color.white.opacity(0.1)
+                (isDark ? Color.black : Color.white).opacity(0.1)
             }
         }
     }
@@ -354,11 +353,14 @@ struct ContentView: View {
     }
 
     private var textColorScheme: ColorScheme {
-        switch settings.appScheme {
-        case .auto: isFullScreen ? .light : colorScheme
-        case .light: .light
-        case .dark: .dark
-        }
+        settings.appScheme.colorScheme ?? colorScheme
+    }
+
+    private var isDark: Bool { textColorScheme == .dark }
+
+    /// The chosen text color; the default black turns white on the black Dark Mode page.
+    private var textColor: Color {
+        settings.textColor(in: textColorScheme, onPlainBackground: settings.activeBackground == nil).color
     }
 
     /// In full screen the settings open inside this window; otherwise in the Settings window.

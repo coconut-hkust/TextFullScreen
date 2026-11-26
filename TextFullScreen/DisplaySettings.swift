@@ -95,6 +95,9 @@ struct DisplaySettings: nonisolated DynamicProperty {
     @AppStorage("gradientTextureAmount") var gradientTextureAmount = 0.0
     /// The appearance buttons at the top of the pad.
     @AppStorage("appScheme") var appScheme: AppScheme = .auto
+    /// On: Settings shows the notes that explain each feature, under its section. Not part of
+    /// the default settings or saved slots, so Load Defaults leaves it as it is.
+    @AppStorage("showsDescriptions") var showsDescriptions = true
 
     /// The color pad. Writing it also writes the gradient's colors. When the stored colors were
     /// changed another way (an older version, a saved slot), the pad is rebuilt from them.
@@ -223,6 +226,18 @@ struct DisplaySettings: nonisolated DynamicProperty {
         default:
             if let fill = wallpaperFills.first(where: { $0.id.uuidString == wallpaperID }) { return fill.background }
             return selectedWallpaper.map(WallpaperBackground.photo)
+        }
+    }
+
+    /// The text color as it's drawn in `scheme`. On the plain background, text the same color as
+    /// the page would vanish, so the default black shows as white in Dark Mode (on the black page),
+    /// and white shows as black in Light Mode. Over a wallpaper the chosen color is kept as it is.
+    func textColor(in scheme: ColorScheme, onPlainBackground: Bool) -> TextColor {
+        guard onPlainBackground else { return color }
+        switch scheme {
+        case .dark where color.rawValue == TextColor.black.rawValue: return .white
+        case .light where color.rawValue == TextColor.white.rawValue: return .black
+        default: return color
         }
     }
 

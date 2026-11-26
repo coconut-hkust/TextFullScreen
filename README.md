@@ -42,6 +42,12 @@ On iPhone and iPad, the app isn't on the App Store yet. For now you can build it
 
 With a free Apple ID (Personal Team), apps on an iPhone or iPad stop working after 7 days and need to be run from Xcode again.
 
+## Feedback
+
+Ideas, problems or things you'd like added? Fill in the short [feedback form](https://docs.google.com/forms/d/e/1FAIpQLSedmBLQH6dR3TXbgIk9d6yJqk8UNzXldvfZYBfv9NcqmSQ2CA/viewform). No account needed. You can also open it from the app: **Settings → About → Send Feedback or Ideas**, or **Help → Send Feedback** on the Mac.
+
+To report a bug with details or screenshots, you can also [open an issue](https://github.com/coconut-hkust/TextFullScreen/issues) on GitHub.
+
 ## Licence
 
 [PolyForm Noncommercial 1.0.0](LICENSE.md). You may use, change and share this software for any **noncommercial** purpose. Commercial use is not allowed without separate permission from the author.

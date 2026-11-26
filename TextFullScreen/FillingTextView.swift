@@ -17,6 +17,8 @@ struct FillingTextView: View {
     var color: Color = .black
     /// Paints the text with a gradient instead of `color` when set.
     var gradient: TextGradient? = nil
+    /// The text grows no larger than this font size, even when the screen has room; nil for no limit.
+    var maxFontSize: CGFloat? = nil
 
     @Environment(\.fontResolutionContext) private var fontContext
 
@@ -27,6 +29,7 @@ struct FillingTextView: View {
                 text: text,
                 in: CGSize(width: size.width * fill, height: size.height * fill),
                 characterColors: gradient?.characterColors(for: text),
+                maxFontSize: maxFontSize,
                 makeFont: { font.font(size: $0, weight: weight).resolve(in: fontContext).ctFont }
             ) else { return }
             context.withCGContext { cg in
@@ -69,7 +72,8 @@ private struct FittedLayout {
 
     /// - Parameter characterColors: a color for each `Character` of `text` (nil keeps the drawing
     ///   color), or nil to draw all of it in the drawing color.
-    init?(text: String, in screen: CGSize, characterColors: [TextColor?]? = nil, makeFont: (CGFloat) -> CTFont) {
+    init?(text: String, in screen: CGSize, characterColors: [TextColor?]? = nil,
+          maxFontSize: CGFloat? = nil, makeFont: (CGFloat) -> CTFont) {
         guard screen.width > 1, screen.height > 1 else { return nil }
 
         let paragraphs = Self.paragraphs(of: text, colors: characterColors)
@@ -77,6 +81,7 @@ private struct FittedLayout {
         // The drawn size grows with the font size, so find the largest one that fits by bisection.
         var low: CGFloat = 1
         var high: CGFloat = max(screen.width, screen.height) * 4
+        if let maxFontSize { high = min(high, maxFontSize + 0.25) }
         var best: FittedLayout?
         for _ in 0..<26 {
             let size = (low + high) / 2

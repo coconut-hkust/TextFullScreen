@@ -32,6 +32,7 @@ struct SettingsView: View {
                     .accessibilityLabel("Text color, \(settings.color.hex)")
                     .popover(isPresented: $isColorPadShown, arrowEdge: .trailing) {
                         ColorPadView()
+                            .fittedSheetOnPhone()
                     }
                 }
 
@@ -115,6 +116,7 @@ struct SettingsView: View {
                     .accessibilityLabel("Gradient colors, \(settings.gradientColors.map(\.hex).joined(separator: ", "))")
                     .popover(isPresented: $isGradientPadShown, arrowEdge: .trailing) {
                         GradientPadView()
+                            .fittedSheetOnPhone()
                     }
                 }
 
@@ -522,6 +524,41 @@ struct SettingsMenuItem: View {
     }
 }
 #endif
+
+#if os(iOS)
+/// On iPhone a popover becomes a full-height sheet, which left the small pads floating in a large
+/// empty panel. This sizes the sheet to the pad instead, so a swipe down anywhere outside the pad
+/// (or on the grabber) goes back to the settings. Used on iPhone only; iPad keeps its popover.
+private struct FittedSheet: ViewModifier {
+    @State private var height: CGFloat = 400
+
+    func body(content: Content) -> some View {
+        content
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 12) // Room for the grabber
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+            .frame(maxWidth: .infinity)
+            .presentationDetents([.height(height)])
+            .presentationDragIndicator(.visible)
+    }
+}
+#endif
+
+extension View {
+    /// See `FittedSheet`. Only on iPhone: an iPad popover and the Mac are left as they are.
+    @ViewBuilder
+    func fittedSheetOnPhone() -> some View {
+        #if os(iOS)
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            modifier(FittedSheet())
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+}
 
 #Preview {
     SettingsView()

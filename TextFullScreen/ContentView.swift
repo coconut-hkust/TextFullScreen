@@ -8,6 +8,8 @@ import UIKit
 struct ContentView: View {
     @State private var text: String = ""
     @State private var isInputVisible: Bool = true
+    /// Where the top of the input panel is on screen (in the window's coordinates), once laid out
+    @State private var inputPanelTop: CGFloat?
     @FocusState private var isFocused: Bool
     #if os(macOS)
     @State private var isFullScreen: Bool = false
@@ -42,23 +44,20 @@ struct ContentView: View {
             GeometryReader { geometry in
                 ZStack {
                     if text.isEmpty {
-                        // Centered Placeholder
-                        VStack {
-                            Spacer()
-                            HStack {
-                                Spacer()
-                                Text("Type something...")
-                                    .font(settings.font.font(size: 80, weight: .bold)) // Adjusted size, in the chosen typeface
-                                    .foregroundColor(.secondary.opacity(0.3))
-                                    .multilineTextAlignment(.center)
-                                    .lineLimit(2)
-                                    .minimumScaleFactor(0.3) // On a narrow iPhone screen, shrink rather than split a word
-                                    .fixedSize(horizontal: false, vertical: true) // Allow wrapping if needed
-                                Spacer()
-                            }
-                            Spacer()
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        // The placeholder, centered by its drawn letters (from the top of "T" to the
+                        // bottom of "g"), so there's as much space above it as below. Centering a
+                        // Text by its line boxes left it low, as they hold room above capitals and
+                        // below the last baseline. It breaks onto two rows on a narrow screen.
+                        FillingTextView(
+                            text: geometry.size.width < geometry.size.height ? "Type\nsomething..." : "Type something...",
+                            font: .standard, // Always SF Pro, whatever typeface is chosen for the text
+                            weight: .bold,
+                            fill: 0.9,
+                            color: placeholderColor,
+                            maxFontSize: 80
+                        )
+                        .offset(y: -placeholderLift(in: geometry.frame(in: .global)))
+                        .frame(width: geometry.size.width, height: geometry.size.height)
                         #if !os(macOS)
                         // With nothing typed yet, a tap only puts the keyboard away
                         .contentShape(Rectangle())
@@ -97,6 +96,12 @@ struct ContentView: View {
                     }
                 }
             }
+            #if !os(macOS)
+            // Measure from the very top of the screen (above the camera) to the very bottom (below
+            // the home indicator), in either orientation, so the text fills the whole screen and the
+            // placeholder sits in its true middle. The keyboard is still kept clear of.
+            .ignoresSafeArea(.container)
+            #endif
             // On the white full-screen background, use Light Mode colors even in Dark Mode, unless
             // the appearance is set to Light or Dark on the color pad
             .environment(\.colorScheme, textColorScheme)
@@ -165,6 +170,7 @@ struct ContentView: View {
                         RoundedRectangle(cornerRadius: 20)
                             .stroke(Color.white.opacity(0.3), lineWidth: 1)
                     )
+                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { inputPanelTop = $0 }
                     .shadow(color: Color.black.opacity(0.15), radius: 15, x: 0, y: 10)
                     .padding(.bottom, 50)
                     .padding(.horizontal, 40)
@@ -233,6 +239,26 @@ struct ContentView: View {
         if fullScreen != isFullScreen { isFullScreen = fullScreen }
     }
     #endif
+
+    /// How far to raise the placeholder from the middle of `area`. On iPhone it's centered in the
+    /// space between the top of the screen and the top of the input panel, so it doesn't look low
+    /// above the panel. With the panel hidden, and on iPad and Mac, it stays in the middle.
+    private func placeholderLift(in area: CGRect) -> CGFloat {
+        #if os(iOS)
+        guard UIDevice.current.userInterfaceIdiom == .phone, isInputVisible,
+              let panelTop = inputPanelTop, panelTop > area.minY, panelTop < area.maxY else { return 0 }
+        return area.midY - (area.minY + panelTop) / 2
+        #else
+        0
+        #endif
+    }
+
+    /// The system's secondary label color, faded, for the placeholder
+    private var placeholderColor: Color {
+        textColorScheme == .dark
+            ? Color(red: 235 / 255, green: 235 / 255, blue: 245 / 255).opacity(0.6 * 0.3)
+            : Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255).opacity(0.6 * 0.3)
+    }
 
     private var textColorScheme: ColorScheme {
         switch settings.appScheme {

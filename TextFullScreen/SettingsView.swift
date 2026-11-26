@@ -59,9 +59,7 @@ struct SettingsView: View {
             Section {
                 Toggle("Separate maximum size for moving", isOn: settings.$separateScrollSize)
 
-                Toggle("Moving", isOn: settings.$scrollEnabled)
-
-                // Shared by both layouts unless scrolling has its own, shown in the Scrolling section
+                // Shared by both layouts unless moving has its own, shown in the Moving section
                 if !settings.scrollEnabled || !settings.separateScrollSize {
                     percentControl("Maximum size", value: settings.$fillPercent, in: DisplaySettings.fillPercentRange)
                 }
@@ -71,9 +69,7 @@ struct SettingsView: View {
                 Text(layoutFooter)
             }
 
-            if settings.scrollEnabled {
-                scrollingSection
-            }
+            scrollingSection
 
             savedSection
         }
@@ -197,56 +193,70 @@ struct SettingsView: View {
         }
     }
 
-    /// Shown only while scrolling is on: pan or rise, which way, how fast and how big.
+    /// The Moving switch, and below it while it's on: pan or rise, which way, how fast and how big.
     private var scrollingSection: some View {
         Section {
-            Picker("Motion", selection: settings.$motion) {
-                ForEach(ScrollMotion.allCases) { motion in
-                    Text(motion.displayName).tag(motion)
-                }
-            }
-            .pickerStyle(.segmented)
+            Toggle("Moving", isOn: settings.$scrollEnabled)
 
-            switch settings.motion {
-            case .pan:
-                Picker("Direction", selection: settings.$panDirection) {
-                    ForEach(PanDirection.allCases) { direction in
-                        Text(direction.displayName).tag(direction)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                Toggle("Keep rows", isOn: settings.$panKeepsRows)
-            case .rise:
-                Picker("Direction", selection: settings.$riseDirection) {
-                    ForEach(RiseDirection.allCases) { direction in
-                        Text(direction.displayName).tag(direction)
-                    }
-                }
-                .pickerStyle(.segmented)
-            }
-
-            titled("Speed") {
-                Slider(value: speedOnDoublingScale, in: log2(DisplaySettings.scrollSpeedRange.lowerBound)...log2(DisplaySettings.scrollSpeedRange.upperBound)) {
-                    Text("Speed")
-                } minimumValueLabel: {
-                    Image(systemName: "tortoise")
-                } maximumValueLabel: {
-                    Image(systemName: "hare")
-                }
-            }
-
-            if settings.separateScrollSize {
-                percentControl("Maximum size", value: scrollSizePercent, in: scrollSizePercentRange)
+            if settings.scrollEnabled {
+                movingControls
             }
         } header: {
             Text("Moving")
         } footer: {
-            Text(settings.motion == .pan
-                 ? (settings.panKeepsRows
-                    ? "Each row pans on its own line, all at the same time. Start a new row with \(newRowKey). At 100% the rows together are as tall as the screen allows."
-                    : "Pan runs the text along one line, joining the rows. At 100% it's as tall as the screen allows.")
-                 : "Rise wraps the text to the screen width. At 100%, the longest word just fits across the screen.")
+            Text(movingFooter)
+        }
+    }
+
+    private var movingFooter: String {
+        guard settings.scrollEnabled else { return "Text stays large and moves across the screen." }
+        return settings.motion == .pan
+            ? (settings.panKeepsRows
+               ? "Each row pans on its own line, all at the same time. Start a new row with \(newRowKey). At 100% the rows together are as tall as the screen allows."
+               : "Pan runs the text along one line, joining the rows. At 100% it's as tall as the screen allows.")
+            : "Rise wraps the text to the screen width. At 100%, the longest word just fits across the screen."
+    }
+
+    @ViewBuilder
+    private var movingControls: some View {
+        Picker("Motion", selection: settings.$motion) {
+            ForEach(ScrollMotion.allCases) { motion in
+                Text(motion.displayName).tag(motion)
+            }
+        }
+        .pickerStyle(.segmented)
+
+        switch settings.motion {
+        case .pan:
+            Picker("Direction", selection: settings.$panDirection) {
+                ForEach(PanDirection.allCases) { direction in
+                    Text(direction.displayName).tag(direction)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Toggle("Keep rows", isOn: settings.$panKeepsRows)
+        case .rise:
+            Picker("Direction", selection: settings.$riseDirection) {
+                ForEach(RiseDirection.allCases) { direction in
+                    Text(direction.displayName).tag(direction)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
+
+        titled("Speed") {
+            Slider(value: speedOnDoublingScale, in: log2(DisplaySettings.scrollSpeedRange.lowerBound)...log2(DisplaySettings.scrollSpeedRange.upperBound)) {
+                Text("Speed")
+            } minimumValueLabel: {
+                Image(systemName: "tortoise")
+            } maximumValueLabel: {
+                Image(systemName: "hare")
+            }
+        }
+
+        if settings.separateScrollSize {
+            percentControl("Maximum size", value: scrollSizePercent, in: scrollSizePercentRange)
         }
     }
 
@@ -294,7 +304,7 @@ struct SettingsView: View {
 
     private var layoutFooter: String {
         let mode = settings.scrollEnabled
-            ? "Text stays large and moves across the screen."
+            ? "Maximum size is how big the text may get."
             : "Text shrinks until all of it fits on the screen. Maximum size is how much of the screen's width and height it may fill."
         let sharing = settings.separateScrollSize
             ? "Moving text has its own maximum size."

@@ -15,7 +15,7 @@ Runs on **iPhone, iPad and Mac** from one SwiftUI project.
 
 ## Download for Mac
 
-Needs macOS 26.1 or later. Runs on Apple silicon and Intel Macs.
+Needs macOS 26.1 or later and a Mac with Apple silicon. On an Intel Mac, use [version 1.004](https://github.com/coconut-hkust/TextFullScreen/releases/tag/v1.004), the last release that runs on Intel.
 
 1. Download the **TextFullScreen-v.1.xxx.zip** file (for example `TextFullScreen-v.1.000.zip`) from the [latest release](https://github.com/coconut-hkust/TextFullScreen/releases/latest) and double-click it to unzip.
 2. Drag **TextFullScreen** into your **Applications** folder.
